@@ -64,6 +64,9 @@ class CreateOrderSerializer(serializers.Serializer):
     items = serializers.ListField(child=serializers.DictField())
     shippingAddress = serializers.DictField()
     paymentMethod = serializers.ChoiceField(choices=['vipps', 'card', 'klarna', 'invoice'])
+    # Optional — frontend now computes a real Profrakt freight cost client-side
+    # and forwards it here. Older clients omit it; fall back to the legacy rule.
+    shipping = serializers.FloatField(required=False, allow_null=True)
 
     def create(self, validated_data):
         from apps.products.models import Product
@@ -73,7 +76,8 @@ class CreateOrderSerializer(serializers.Serializer):
             float(i.get('price', 0)) * int(i.get('quantity', 1))
             for i in validated_data['items']
         )
-        shipping = 0 if subtotal >= 500 else 79
+        client_shipping = validated_data.get('shipping')
+        shipping = float(client_shipping) if client_shipping is not None else (0 if subtotal >= 500 else 79)
 
         order = Order.objects.create(
             user=self.context.get('user'),

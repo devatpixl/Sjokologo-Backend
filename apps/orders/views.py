@@ -1,13 +1,15 @@
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .models import Order
 from .serializers import OrderSerializer, CreateOrderSerializer
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_order(request):
-    user = request.user if request.user.is_authenticated else None
+    user = request.user
     serializer = CreateOrderSerializer(data=request.data, context={'user': user, 'request': request})
     if serializer.is_valid():
         order = serializer.save()

@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'apps.products',
     'apps.orders',
     'apps.utils',
+    'apps.payments_vipps',
 ]
 
 MIDDLEWARE = [
@@ -101,4 +102,49 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'UPDATE_LAST_LOGIN': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# ── Vipps ePayment ─────────────────────────────────────────────────────────
+# All keys come from the Vipps developer portal. Keep them out of source
+# control (use .env) — see .env.example for the full set.
+VIPPS_BASE_URL = env('VIPPS_BASE_URL', default='https://apitest.vipps.no')
+VIPPS_CLIENT_ID = env('VIPPS_CLIENT_ID', default='')
+VIPPS_CLIENT_SECRET = env('VIPPS_CLIENT_SECRET', default='')
+VIPPS_SUBSCRIPTION_KEY = env('VIPPS_SUBSCRIPTION_KEY', default='')
+VIPPS_MERCHANT_SERIAL_NUMBER = env('VIPPS_MERCHANT_SERIAL_NUMBER', default='')
+VIPPS_SYSTEM_NAME = env('VIPPS_SYSTEM_NAME', default='sjokoloko')
+VIPPS_SYSTEM_VERSION = env('VIPPS_SYSTEM_VERSION', default='1.0.0')
+VIPPS_SYSTEM_PLUGIN_NAME = env('VIPPS_SYSTEM_PLUGIN_NAME', default='sjokoloko-vipps')
+VIPPS_SYSTEM_PLUGIN_VERSION = env('VIPPS_SYSTEM_PLUGIN_VERSION', default='1.0.0')
+VIPPS_RETURN_URL_BASE = env(
+    'VIPPS_RETURN_URL_BASE',
+    default='http://localhost:3000/kasse/retur',
+)
+VIPPS_WEBHOOK_URL = env('VIPPS_WEBHOOK_URL', default='')
+VIPPS_REFERENCE_PREFIX = env('VIPPS_REFERENCE_PREFIX', default='sl')
+VIPPS_HTTP_TIMEOUT = env.float('VIPPS_HTTP_TIMEOUT', default=4.0)
+VIPPS_TEST_PHONE = env('VIPPS_TEST_PHONE', default='')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'apps.payments_vipps': {
+            'handlers': ['console'],
+            'level': env('VIPPS_LOG_LEVEL', default='INFO'),
+            'propagate': False,
+        },
+    },
 }

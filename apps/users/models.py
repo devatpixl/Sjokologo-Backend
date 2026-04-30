@@ -21,9 +21,20 @@ class CustomUserManager(BaseUserManager):
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
+    USER_TYPE_CHOICES = [
+        ('registered', 'Registered'),
+        ('guest', 'Guest'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
+    user_type = models.CharField(
+        max_length=12,
+        choices=USER_TYPE_CHOICES,
+        default='registered',
+        db_index=True,
+    )
     is_admin = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)

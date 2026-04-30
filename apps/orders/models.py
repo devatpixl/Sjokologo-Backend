@@ -53,6 +53,7 @@ class Order(models.Model):
     SHIPPING_METHOD_CHOICES = [
         ('self-pickup',        'Hent i butikk (Ås)'),
         ('bring-pickup-point', 'Bring – hentested'),
+        ('postnord-locker',    'PostNord pakkeboks'),
     ]
     shipping_method = models.CharField(
         max_length=24,

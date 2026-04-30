@@ -94,7 +94,7 @@ class CreateOrderSerializer(serializers.Serializer):
     # Bring vs. self-pickup. When 'bring-pickup-point', pickupPoint and
     # consignment are expected to be present. Self-pickup leaves them null.
     shippingMethod = serializers.ChoiceField(
-        choices=['self-pickup', 'bring-pickup-point'],
+        choices=['self-pickup', 'bring-pickup-point', 'postnord-locker'],
         required=False, allow_null=True,
     )
     pickupPoint = serializers.DictField(required=False, allow_null=True)

@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from apps.users.admin_views import admin_stats, admin_user_list, admin_user_detail
-from apps.products.admin_views import admin_product_list, admin_product_detail
+from apps.products.admin_views import admin_product_list, admin_product_detail, admin_truffle_list, admin_truffle_detail
 from apps.orders.admin_views import admin_order_list, admin_order_detail
 from apps.utils.admin_views import admin_waitlist, admin_waitlist_detail, admin_contact_list, admin_contact_detail
 
@@ -12,6 +12,8 @@ admin_patterns = [
     path('stats/', admin_stats, name='admin_stats'),
     path('products/', admin_product_list, name='admin_product_list'),
     path('products/<int:pk>/', admin_product_detail, name='admin_product_detail'),
+    path('truffles/', admin_truffle_list, name='admin_truffle_list'),
+    path('truffles/<str:pk>/', admin_truffle_detail, name='admin_truffle_detail'),
     path('orders/', admin_order_list, name='admin_order_list'),
     path('orders/<str:order_number>/', admin_order_detail, name='admin_order_detail'),
     path('users/', admin_user_list, name='admin_user_list'),

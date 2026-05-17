@@ -112,13 +112,11 @@ class CreateOrderSerializer(serializers.Serializer):
             float(i.get('price', 0)) * int(i.get('quantity', 1))
             for i in validated_data['items']
         )
-        # Trust storefront's shipping value when supplied (it came from Profrakt).
-        # Fall back to the legacy 0/79 rule for callers that don't send shipping.
+        # Trust storefront's shipping value when supplied (it came from Profrakt
+        # or is 0 for self-pickup). No free-over-X-threshold rule — only the
+        # self-pickup method is free, and that's already 0 from the client.
         shipping_supplied = validated_data.get('shipping')
-        if shipping_supplied is None:
-            shipping = 0 if subtotal >= 500 else 79
-        else:
-            shipping = float(shipping_supplied)
+        shipping = float(shipping_supplied) if shipping_supplied is not None else 0.0
 
         shipping_method = validated_data.get('shippingMethod') or None
         pickup = validated_data.get('pickupPoint') or {}

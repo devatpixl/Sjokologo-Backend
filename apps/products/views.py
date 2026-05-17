@@ -6,7 +6,7 @@ from .serializers import ProductSerializer, TruffleSerializer
 
 @api_view(['GET'])
 def product_list(request):
-    qs = Product.objects.all()
+    qs = Product.objects.filter(in_stock=True)
     category = request.query_params.get('category')
     if category:
         qs = qs.filter(category=category)
@@ -29,4 +29,4 @@ def product_slugs(request):
 
 @api_view(['GET'])
 def truffle_list(request):
-    return Response(TruffleSerializer(Truffle.objects.all(), many=True).data)
+    return Response(TruffleSerializer(Truffle.objects.filter(is_active=True), many=True).data)

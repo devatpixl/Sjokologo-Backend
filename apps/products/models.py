@@ -19,6 +19,8 @@ class Product(models.Model):
     flavors = models.JSONField(default=list)
     blurb = models.TextField()
     in_stock = models.BooleanField(default=True)
+    variant_group = models.CharField(max_length=64, blank=True, default='')
+    variant_label = models.CharField(max_length=64, blank=True, default='')
     batch_number = models.CharField(max_length=10)
     batch_count = models.PositiveIntegerField(default=0)
     batch_total = models.PositiveIntegerField(default=0)
@@ -37,6 +39,7 @@ class Truffle(models.Model):
     name = models.CharField(max_length=100)
     color = models.CharField(max_length=7)
     note = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name

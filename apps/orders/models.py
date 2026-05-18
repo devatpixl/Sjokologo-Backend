@@ -39,6 +39,19 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Bekreftet')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
 
+    # Discount snapshot — captured at order-create time by the serializer.
+    # Always set together: coupon_code is the redeemed code, discount_amount
+    # is the NOK off subtotal, coupon_free_shipping records whether the coupon
+    # also zeroed shipping. Blank/0/False when no coupon was applied.
+    coupon_code = models.CharField(max_length=40, blank=True, default='', db_index=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    coupon_free_shipping = models.BooleanField(default=False)
+
+    # Auto-applied bundle snapshot. Format: [{ "rule_id": 1, "name": "...",
+    # "qty_consumed": 3, "bundle_price": "949.00" }]. Empty list when no
+    # bundle fired. Persisted so admin can audit "why is this total lower?"
+    bundles_applied = models.JSONField(default=list, blank=True)
+
     # Shipping address — embedded directly
     ship_first_name = models.CharField(max_length=100)
     ship_last_name = models.CharField(max_length=100)

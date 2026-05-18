@@ -48,6 +48,8 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'user', 'customer_name',
             'subtotal', 'shipping', 'total',
+            'coupon_code', 'discount_amount', 'coupon_free_shipping',
+            'bundles_applied',
             'status', 'payment_method', 'payment_status',
             'shipping_address', 'items',
             # Shipping method + Profrakt consignment (visible to client so /takk
@@ -103,20 +105,113 @@ class CreateOrderSerializer(serializers.Serializer):
     shippingExpectedDelivery = serializers.CharField(
         required=False, allow_blank=True, allow_null=True, max_length=20,
     )
+    # Rabattkode entered by the customer. Re-validated server-side; an
+    # invalid/expired code is dropped silently so the order still goes through.
+    couponCode = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=40,
+    )
 
     def create(self, validated_data):
+        from decimal import Decimal
+        from django.conf import settings as dj_settings
+        from django.db.models import F
         from apps.products.models import Product
+        from apps.coupons.models import Coupon
+        from apps.bundles.models import BundleRule
 
         addr = validated_data['shippingAddress']
+
+        # Build line entries up front: we need them for bundle matching and
+        # OrderItem creation. Trust client prices for subtotal (matches the
+        # storefront-displayed total); OrderItem.unit_price still uses the DB
+        # value for downstream accounting.
+        item_lines = []
+        for i in validated_data['items']:
+            try:
+                product = Product.objects.get(slug=i.get('slug', ''))
+            except Product.DoesNotExist:
+                continue
+            qty = int(i.get('quantity', 1))
+            unit_price = Decimal(str(i.get('price', 0)))
+            item_lines.append({'product': product, 'qty': qty, 'unit_price': unit_price, 'raw': i})
+
         subtotal = sum(
-            float(i.get('price', 0)) * int(i.get('quantity', 1))
-            for i in validated_data['items']
+            (line['unit_price'] * line['qty'] for line in item_lines),
+            Decimal('0'),
         )
-        # Trust storefront's shipping value when supplied (it came from Profrakt
-        # or is 0 for self-pickup). No free-over-X-threshold rule — only the
-        # self-pickup method is free, and that's already 0 from the client.
+
+        # 1. Auto-apply bundle rules. Each rule replaces N matching units'
+        # line subtotal with bundle_price. The discount is the raw-vs-bundle
+        # difference. Track per-rule for audit + free-shipping signal.
+        bundles_applied = []
+        bundle_discount = Decimal('0')
+        bundle_free_shipping = False
+        active_bundles = [r for r in BundleRule.objects.filter(is_active=True) if r.is_currently_active()]
+        for rule in active_bundles:
+            matching_qty = sum(line['qty'] for line in item_lines if rule.matches_product(line['product']))
+            bundles_count = matching_qty // rule.required_quantity if rule.required_quantity else 0
+            if bundles_count <= 0:
+                continue
+            # Sum the unit_prices of the matched-and-consumed units.
+            consumed_remaining = bundles_count * rule.required_quantity
+            matched_raw = Decimal('0')
+            for line in item_lines:
+                if not rule.matches_product(line['product']) or consumed_remaining <= 0:
+                    continue
+                take = min(line['qty'], consumed_remaining)
+                matched_raw += line['unit_price'] * take
+                consumed_remaining -= take
+            bundle_subtotal = rule.bundle_price * bundles_count
+            this_discount = matched_raw - bundle_subtotal
+            if this_discount <= 0:
+                continue
+            bundle_discount += this_discount
+            bundles_applied.append({
+                'rule_id': rule.id,
+                'name': rule.name,
+                'qty_consumed': int(bundles_count * rule.required_quantity),
+                'bundle_price': str(rule.bundle_price),
+                'discount': str(this_discount),
+            })
+            if rule.includes_free_shipping:
+                bundle_free_shipping = True
+
+        # 2. Apply coupon (re-validated server-side, applied to post-bundle
+        # subtotal so coupons stack with bundles cleanly).
+        post_bundle_subtotal = subtotal - bundle_discount
+        coupon_code = ''
+        coupon_discount = Decimal('0')
+        coupon_free_shipping = False
+        submitted_code = (validated_data.get('couponCode') or '').strip().upper()
+        if submitted_code:
+            coupon = Coupon.objects.filter(code=submitted_code).first()
+            if coupon:
+                ok, _ = coupon.is_currently_valid(subtotal=post_bundle_subtotal)
+                if ok:
+                    coupon_discount = coupon.compute_discount(post_bundle_subtotal)
+                    coupon_code = coupon.code
+                    coupon_free_shipping = coupon.gives_free_shipping()
+                    Coupon.objects.filter(pk=coupon.pk).update(times_used=F('times_used') + 1)
+
+        total_discount = bundle_discount + coupon_discount
+
+        # 3. Shipping resolution. Free if: cart subtotal (raw, pre-discount)
+        # clears the threshold for any combination of products, OR coupon
+        # kind=free_shipping, OR an applied bundle includes it. The threshold
+        # is intentionally checked against the raw subtotal so a coupon that
+        # drops the post-discount amount below the threshold doesn't strip
+        # the customer of their free-shipping reward.
         shipping_supplied = validated_data.get('shipping')
-        shipping = float(shipping_supplied) if shipping_supplied is not None else 0.0
+        shipping = Decimal(str(shipping_supplied)) if shipping_supplied is not None else Decimal('0')
+        free_shipping_threshold = Decimal(str(
+            getattr(dj_settings, 'FREE_SHIPPING_THRESHOLD_NOK', 949)
+        ))
+        if (subtotal >= free_shipping_threshold
+                or coupon_free_shipping
+                or bundle_free_shipping):
+            shipping = Decimal('0')
+
+        total = subtotal - total_discount + shipping
 
         shipping_method = validated_data.get('shippingMethod') or None
         pickup = validated_data.get('pickupPoint') or {}
@@ -127,7 +222,11 @@ class CreateOrderSerializer(serializers.Serializer):
             user=user,
             subtotal=subtotal,
             shipping=shipping,
-            total=subtotal + shipping,
+            total=total,
+            coupon_code=coupon_code,
+            discount_amount=total_discount,
+            coupon_free_shipping=coupon_free_shipping,
+            bundles_applied=bundles_applied,
             payment_method=validated_data.get('paymentMethod', 'vipps'),
             ship_first_name=addr.get('firstName', ''),
             ship_last_name=addr.get('lastName', ''),
@@ -153,20 +252,16 @@ class CreateOrderSerializer(serializers.Serializer):
             shipping_expected_delivery=validated_data.get('shippingExpectedDelivery') or None,
         )
 
-        for item_data in validated_data['items']:
-            try:
-                product = Product.objects.get(slug=item_data.get('slug', ''))
-                OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=item_data.get('quantity', 1),
-                    unit_price=product.price,
-                    variant=item_data.get('variant', ''),
-                    initials=item_data.get('initials', ''),
-                    custom_slots=item_data.get('customSlots'),
-                )
-            except Product.DoesNotExist:
-                pass
+        for line in item_lines:
+            OrderItem.objects.create(
+                order=order,
+                product=line['product'],
+                quantity=line['qty'],
+                unit_price=line['product'].price,
+                variant=line['raw'].get('variant', ''),
+                initials=line['raw'].get('initials', ''),
+                custom_slots=line['raw'].get('customSlots'),
+            )
 
         record_order_event(
             order,
@@ -176,6 +271,10 @@ class CreateOrderSerializer(serializers.Serializer):
             to_value={
                 'order_number': order.order_number,
                 'total': str(order.total),
+                'subtotal': str(order.subtotal),
+                'discount_amount': str(order.discount_amount),
+                'coupon_code': order.coupon_code or None,
+                'bundles_applied': order.bundles_applied,
                 'payment_method': order.payment_method,
                 'user_type': user.user_type if user else None,
                 'shipping_method': order.shipping_method,

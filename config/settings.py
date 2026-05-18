@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'apps.orders',
     'apps.utils',
     'apps.payments_vipps',
+    'apps.coupons',
+    'apps.bundles',
 ]
 
 MIDDLEWARE = [
@@ -80,6 +82,11 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Free shipping kicks in when the cart subtotal (NOK, before shipping) clears
+# this threshold. Enforced in CreateOrderSerializer. Storefront mirrors this
+# constant in lib/cart-shipping.ts — keep both in sync.
+FREE_SHIPPING_THRESHOLD_NOK = env.int('FREE_SHIPPING_THRESHOLD_NOK', default=949)
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True

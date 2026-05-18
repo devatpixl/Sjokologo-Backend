@@ -67,11 +67,15 @@ class Coupon(models.Model):
         return True, ''
 
     def compute_discount(self, subtotal: Decimal) -> Decimal:
-        """NOK amount to subtract from subtotal. Never exceeds subtotal."""
+        """NOK amount to subtract from subtotal. Rounded to whole NOK so the
+        storefront's whole-NOK price displays don't introduce awkward sub-NOK
+        decimals in the total (e.g. 10% of 949 → 95 NOK, not 94.90).
+        Never exceeds subtotal.
+        """
         if self.kind == self.KIND_PERCENT:
-            raw = (subtotal * self.value / Decimal('100')).quantize(Decimal('0.01'))
+            raw = (subtotal * self.value / Decimal('100')).quantize(Decimal('1'))
         elif self.kind == self.KIND_FIXED:
-            raw = self.value
+            raw = self.value.quantize(Decimal('1'))
         else:
             raw = Decimal('0')
         return max(Decimal('0'), min(raw, subtotal))

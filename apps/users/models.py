@@ -58,3 +58,48 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class LoyaltyMember(models.Model):
+    """Captured from the /bli-medlem landing-page signup form.
+
+    Separate from CustomUser on purpose — these are top-of-funnel email
+    captures that may or may not become real registered accounts. Email is
+    the natural key (one membership per email address).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    first_name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=30)
+    birthday = models.DateField(null=True, blank=True)
+    source = models.CharField(max_length=40, default='landing', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.first_name} <{self.email}>'
+
+
+class VippsIdentity(models.Model):
+    """Link a CustomUser to their Vipps account via the OIDC `sub` claim.
+
+    `sub` is the stable identifier Vipps returns; email/phone can change but
+    sub does not. We key off sub on login, fall back to verified email when
+    no link exists yet (auto-link strategy).
+    """
+    user = models.OneToOneField(
+        CustomUser, on_delete=models.CASCADE, related_name='vipps_identity'
+    )
+    sub = models.CharField(max_length=255, unique=True, db_index=True)
+    last_userinfo = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'Vipps identities'
+
+    def __str__(self):
+        return f'{self.user.email} ↔ vipps:{self.sub[:8]}…'

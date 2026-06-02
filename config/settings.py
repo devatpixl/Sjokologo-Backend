@@ -86,7 +86,28 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Free shipping kicks in when the cart subtotal (NOK, before shipping) clears
 # this threshold. Enforced in CreateOrderSerializer. Storefront mirrors this
 # constant in lib/cart-shipping.ts — keep both in sync.
-FREE_SHIPPING_THRESHOLD_NOK = env.int('FREE_SHIPPING_THRESHOLD_NOK', default=949)
+FREE_SHIPPING_THRESHOLD_NOK = env.int('FREE_SHIPPING_THRESHOLD_NOK', default=349)
+
+# ── Email (Gmail SMTP) ─────────────────────────────────────────────
+# Used for transactional mail like the loyalty signup confirmation.
+# EMAIL_HOST_PASSWORD must be a Gmail "App password" (not the account
+# password) — generated at https://myaccount.google.com/apppasswords.
+EMAIL_BACKEND = env(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env(
+    'DEFAULT_FROM_EMAIL',
+    default='Sjoko Loco <dev@pixlmedia.no>',
+)
+
+# Storefront base used inside transactional email links (e.g. "Handle her").
+STOREFRONT_URL = env('STOREFRONT_URL', default='https://www.sjokoloco.no')
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True
@@ -131,6 +152,30 @@ VIPPS_WEBHOOK_URL = env('VIPPS_WEBHOOK_URL', default='')
 VIPPS_REFERENCE_PREFIX = env('VIPPS_REFERENCE_PREFIX', default='sl')
 VIPPS_HTTP_TIMEOUT = env.float('VIPPS_HTTP_TIMEOUT', default=4.0)
 VIPPS_TEST_PHONE = env('VIPPS_TEST_PHONE', default='')
+
+# ── Vipps Login (OIDC) ──────────────────────────────────────────────────
+VIPPS_LOGIN_ISSUER_URL = env(
+    'VIPPS_LOGIN_ISSUER_URL',
+    default='https://apitest.vipps.no/access-management-1.0/access',
+)
+VIPPS_LOGIN_USERINFO_URL = env(
+    'VIPPS_LOGIN_USERINFO_URL',
+    default='https://apitest.vipps.no/vipps-userinfo-api/userinfo/',
+)
+VIPPS_LOGIN_REDIRECT_URI = env(
+    'VIPPS_LOGIN_REDIRECT_URI',
+    default='http://localhost:8000/api/auth/vipps/callback/',
+)
+VIPPS_LOGIN_SCOPES = env(
+    'VIPPS_LOGIN_SCOPES', default='openid name email phoneNumber'
+)
+VIPPS_LOGIN_STOREFRONT_FINISH_URL = env(
+    'VIPPS_LOGIN_STOREFRONT_FINISH_URL',
+    default='http://localhost:3000/vipps-finish',
+)
+VIPPS_LOGIN_HANDOFF_SECRET = env(
+    'VIPPS_LOGIN_HANDOFF_SECRET', default=SECRET_KEY
+)
 
 LOGGING = {
     'version': 1,

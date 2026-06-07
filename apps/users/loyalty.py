@@ -2,7 +2,7 @@
 
 The ``POST /api/loyalty/signup/`` endpoint captures the form posted from
 ``/bli-medlem`` on the storefront and sends a welcome email with the
-lifetime 20% discount code (``FAMILIE``) via the configured SMTP backend.
+lifetime 20% discount code (``STAND``) via the configured SMTP backend.
 
 The discount code itself is configured in the admin; we just reference it
 by name in the email body.
@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 
 # The discount code referenced in the welcome email. Created manually in
 # the admin (kind=percent, value=20, no expiry, unlimited uses).
-LOYALTY_DISCOUNT_CODE = 'FAMILIE'
+LOYALTY_DISCOUNT_CODE = 'STAND'
 
 
 class LoyaltySignupSerializer(serializers.Serializer):
@@ -99,7 +99,7 @@ def loyalty_signup_view(request):
 
 def _send_welcome_email(member: LoyaltyMember) -> None:
     """Send the bilingual Norwegian welcome email with the discount code."""
-    storefront = settings.STOREFRONT_URL.rstrip('/')
+    storefront = 'https://sjokoloco.no'
     subject = 'Velkommen til Sjoko Loco-familien — 20% rabattkode'
 
     # Plain-text fallback (for clients that don't render HTML).

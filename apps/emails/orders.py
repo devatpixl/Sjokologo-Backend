@@ -107,7 +107,7 @@ def _totals_for_template(order) -> list[tuple[str, str]]:
 # ── #3 Order confirmation (customer) ───────────────────────────────────────
 
 def send_order_confirmation_email(order) -> bool:
-    storefront = settings.STOREFRONT_URL.rstrip('/')
+    storefront = 'https://sjokoloco.no'
     first = _first_name(order)
     subject = f'Ordrebekreftelse — #{order.order_number}'
 
@@ -370,7 +370,7 @@ def send_order_shipped_email(order) -> bool:
 # ── #7 Delivered (customer) ────────────────────────────────────────────────
 
 def send_order_delivered_email(order) -> bool:
-    storefront = settings.STOREFRONT_URL.rstrip('/')
+    storefront = 'https://sjokoloco.no'
     first = _first_name(order)
     subject = f'Takk for bestillingen — håper det smaker! (#{order.order_number})'
 

@@ -19,7 +19,7 @@ def _first_name(user) -> str:
 
 def send_welcome_email(user) -> bool:
     """#1 — Welcome the brand-new customer to Sjoko Loco."""
-    storefront = settings.STOREFRONT_URL.rstrip('/')
+    storefront = 'https://sjokoloco.no'
     first = _first_name(user)
     subject = 'Velkommen til Sjoko Loco'
 

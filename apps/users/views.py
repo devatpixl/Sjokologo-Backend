@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from rest_framework import status
@@ -7,8 +8,13 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import AccessToken
+
+from apps.emails import send_admin_new_signup_email, send_welcome_email
+
 from .models import CustomUser
 from .serializers import RegisterSerializer, AuthResponseSerializer, UserSerializer, UserUpdateSerializer, PasswordChangeSerializer
+
+log = logging.getLogger(__name__)
 
 
 class SjokolokoTokenSerializer(TokenObtainPairSerializer):
@@ -34,6 +40,17 @@ def register_view(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        # Welcome + ops notification are best-effort: a Gmail blip must
+        # never block account creation. Both helpers already swallow and
+        # log their own exceptions, but we wrap defensively too.
+        try:
+            send_welcome_email(user)
+        except Exception:
+            log.exception('welcome email crashed for %s', user.email)
+        try:
+            send_admin_new_signup_email(user)
+        except Exception:
+            log.exception('admin new-signup email crashed for %s', user.email)
         return Response(AuthResponseSerializer.for_user(user), status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

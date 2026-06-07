@@ -1,9 +1,29 @@
+import logging
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
+
+from apps.emails import (
+    send_order_delivered_email,
+    send_order_packing_email,
+    send_order_shipped_email,
+)
+from apps.users.permissions import IsAdminUser
+
 from .models import Order
 from .serializers import OrderSerializer, OrderStatusSerializer
-from apps.users.permissions import IsAdminUser
+
+log = logging.getLogger(__name__)
+
+# Map each fulfillment-status target to the email helper that should fire
+# when the order transitions *into* that status. Only emits one email per
+# real change; idempotent saves (PATCH same status) emit nothing.
+_STATUS_EMAIL_HANDLERS = {
+    'Pakkes': send_order_packing_email,
+    'Sendt':  send_order_shipped_email,
+    'Levert': send_order_delivered_email,
+}
 
 
 @api_view(['GET'])
@@ -34,8 +54,19 @@ def admin_order_detail(request, order_number):
         order.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    previous_status = order.status
     serializer = OrderStatusSerializer(order, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
+        new_status = order.status
+        if new_status != previous_status:
+            handler = _STATUS_EMAIL_HANDLERS.get(new_status)
+            if handler is not None:
+                try:
+                    handler(order)
+                except Exception:
+                    log.exception(
+                        '%s email crashed for %s', new_status, order.order_number
+                    )
         return Response(OrderSerializer(order, context={'request': request}).data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'apps.payments_vipps',
     'apps.coupons',
     'apps.bundles',
+    'apps.emails',
 ]
 
 MIDDLEWARE = [
@@ -107,7 +108,21 @@ DEFAULT_FROM_EMAIL = env(
 )
 
 # Storefront base used inside transactional email links (e.g. "Handle her").
-STOREFRONT_URL = env('STOREFRONT_URL', default='https://www.sjokoloco.no')
+# Canonical URL is the bare apex — no `www` — and `.env` on every environment
+# must match. Hardcoding the domain anywhere outside this setting is a bug.
+STOREFRONT_URL = env('STOREFRONT_URL', default='https://sjokoloco.no')
+
+# Admin dashboard base used in internal notification emails ("see order in admin").
+ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
+
+# Recipients for internal "new signup / new order" notification emails.
+# Comma-separated list (e.g. "terje@sjokoloco.no,andreas@sjokoloco.no").
+# All listed addresses get bcc-style copies of #2 + #4 in one SMTP send.
+ADMIN_NOTIFY_EMAILS = env.list('ADMIN_NOTIFY_EMAILS', default=[])
+
+# When set, every transactional email is rewritten to this address and the
+# original recipient is stamped into the subject. Leave empty in production.
+EMAIL_TEST_OVERRIDE = env('EMAIL_TEST_OVERRIDE', default='')
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True
@@ -196,6 +211,11 @@ LOGGING = {
         'apps.payments_vipps': {
             'handlers': ['console'],
             'level': env('VIPPS_LOG_LEVEL', default='INFO'),
+            'propagate': False,
+        },
+        'apps.emails': {
+            'handlers': ['console'],
+            'level': env('EMAIL_LOG_LEVEL', default='INFO'),
             'propagate': False,
         },
     },

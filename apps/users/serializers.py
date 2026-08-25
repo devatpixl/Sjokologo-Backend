@@ -19,16 +19,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    # Collected at signup and reused for checkout autofill.
+    phone = serializers.CharField(max_length=30, trim_whitespace=True)
 
     class Meta:
         model = CustomUser
-        fields = ['name', 'email', 'password']
+        fields = ['name', 'email', 'phone', 'password']
 
     def create(self, validated_data):
         return CustomUser.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
             name=validated_data['name'],
+            phone=validated_data['phone'],
         )
 
 

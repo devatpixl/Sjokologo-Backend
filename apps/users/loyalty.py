@@ -115,7 +115,7 @@ def _send_welcome_email(member: LoyaltyMember) -> None:
         'All konfekt fra Sjoko Loco blir håndlaget i Ås, og vi sender over hele landet.\n\n'
         'Vi har stort fokus på kvalitet, og bruker kun naturlige råvarer — '
         'helt uten aroma eller konserveringsmidler.\n\n'
-        'Fri frakt på alle bestillinger over 349 kr.\n\n'
+        'Fri frakt på alle bestillinger over 299 kr.\n\n'
         f'Handle her: {storefront}\n\n'
         'Velkommen til Sjoko Loco-familien — vi gleder oss til å dele '
         'sjokoladenyheter, eksklusive tilbud og søte overraskelser med deg.\n\n'
@@ -231,7 +231,7 @@ def _render_welcome_html(first_name: str, storefront: str) -> str:
                 Vi har stort fokus på kvalitet, og bruker kun naturlige råvarer — helt uten aroma eller konserveringsmidler.
               </p>
               <p style="margin:0; font-size:14px; line-height:1.7; color:#C9A35B;">
-                Fri frakt på alle bestillinger over 349 kr.
+                Fri frakt på alle bestillinger over 299 kr.
               </p>
             </td>
           </tr>

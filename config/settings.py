@@ -87,7 +87,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Free shipping kicks in when the cart subtotal (NOK, before shipping) clears
 # this threshold. Enforced in CreateOrderSerializer. Storefront mirrors this
 # constant in lib/cart-shipping.ts — keep both in sync.
-FREE_SHIPPING_THRESHOLD_NOK = env.int('FREE_SHIPPING_THRESHOLD_NOK', default=349)
+FREE_SHIPPING_THRESHOLD_NOK = env.int('FREE_SHIPPING_THRESHOLD_NOK', default=299)
 
 # ── Email (Gmail SMTP) ─────────────────────────────────────────────
 # Used for transactional mail like the loyalty signup confirmation.

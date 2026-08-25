@@ -28,7 +28,7 @@ def send_welcome_email(user) -> bool:
         'Takk for at du opprettet en konto hos Sjoko Loco.\n\n'
         'Hos oss finner du håndlaget konfekt fra Ås, laget med naturlige '
         'råvarer — helt uten aroma eller konserveringsmidler.\n\n'
-        'Fri frakt på alle bestillinger over 349 kr.\n\n'
+        'Fri frakt på alle bestillinger over 299 kr.\n\n'
         f'Handle her: {storefront}\n\n'
         'Hilsen\n'
         'Team Sjoko Loco'
@@ -38,7 +38,7 @@ def send_welcome_email(user) -> bool:
         '<p style="margin:0 0 12px;">Takk for at du opprettet en konto hos Sjoko Loco.</p>'
         '<p style="margin:0 0 12px;">Hos oss finner du håndlaget konfekt fra Ås, '
         'laget med naturlige råvarer — helt uten aroma eller konserveringsmidler.</p>'
-        '<p style="margin:0; color:#C9A35B;">Fri frakt på alle bestillinger over 349 kr.</p>'
+        '<p style="margin:0; color:#C9A35B;">Fri frakt på alle bestillinger over 299 kr.</p>'
     )
 
     html = render_layout(

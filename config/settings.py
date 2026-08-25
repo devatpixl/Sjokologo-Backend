@@ -112,6 +112,10 @@ DEFAULT_FROM_EMAIL = env(
 # must match. Hardcoding the domain anywhere outside this setting is a bug.
 STOREFRONT_URL = env('STOREFRONT_URL', default='https://sjokoloco.no')
 
+# Welcome / "glemt passord" links are valid for 7 days — customers often sign
+# up at a stand and read their mail days later.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7
+
 # Admin dashboard base used in internal notification emails ("see order in admin").
 ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
 

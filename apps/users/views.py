@@ -9,10 +9,16 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import AccessToken
 
-from apps.emails import send_admin_new_signup_email, send_welcome_email
+from apps.emails import (
+    send_admin_new_signup_email, send_welcome_email, send_password_reset_email,
+)
 
 from .models import CustomUser
-from .serializers import RegisterSerializer, AuthResponseSerializer, UserSerializer, UserUpdateSerializer, PasswordChangeSerializer
+from .serializers import (
+    RegisterSerializer, AuthResponseSerializer, UserSerializer, UserUpdateSerializer,
+    PasswordChangeSerializer, SetPasswordSerializer, PasswordResetRequestSerializer,
+)
+from .password_setup import build_password_link, resolve_password_token
 
 log = logging.getLogger(__name__)
 
@@ -44,15 +50,61 @@ def register_view(request):
         # never block account creation. Both helpers already swallow and
         # log their own exceptions, but we wrap defensively too.
         try:
-            send_welcome_email(user)
+            send_welcome_email(user, password_url=build_password_link(user))
         except Exception:
             log.exception('welcome email crashed for %s', user.email)
         try:
             send_admin_new_signup_email(user)
         except Exception:
             log.exception('admin new-signup email crashed for %s', user.email)
-        return Response(AuthResponseSerializer.for_user(user), status=status.HTTP_201_CREATED)
+        # No auth tokens here: the account has no password yet, so the customer
+        # signs in only after following the link in their welcome e-mail.
+        return Response(
+            {'detail': 'created', 'email': user.email},
+            status=status.HTTP_201_CREATED,
+        )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def set_password_view(request):
+    """Set a password from a welcome / reset link and sign the customer in."""
+    serializer = SetPasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    data = serializer.validated_data
+    user = resolve_password_token(data['uid'], data['token'])
+    if user is None:
+        return Response(
+            {'detail': 'Lenken er ugyldig eller utløpt. Be om en ny lenke.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(data['password'])
+    user.save(update_fields=['password'])
+    log.info('password set via link for %s', user.email)
+    return Response(AuthResponseSerializer.for_user(user), status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def password_reset_request_view(request):
+    """Send a fresh password link. Always 200 — never reveal who has an account."""
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email']
+    user = CustomUser.objects.filter(email__iexact=email, is_active=True).first()
+    if user is not None:
+        try:
+            send_password_reset_email(user, build_password_link(user))
+        except Exception:
+            log.exception('password reset email crashed for %s', user.email)
+    else:
+        log.info('password reset requested for unknown address %s', email)
+
+    return Response({'detail': 'sent'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'PATCH'])

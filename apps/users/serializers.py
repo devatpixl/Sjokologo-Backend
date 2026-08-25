@@ -18,21 +18,37 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
     # Collected at signup and reused for checkout autofill.
     phone = serializers.CharField(max_length=30, trim_whitespace=True)
 
     class Meta:
         model = CustomUser
-        fields = ['name', 'email', 'phone', 'password']
+        fields = ['name', 'email', 'phone']
 
     def create(self, validated_data):
-        return CustomUser.objects.create_user(
+        # No password on the signup form — the customer chooses one from the
+        # tokenised link in their welcome e-mail, so the account starts with
+        # an unusable password (same as Vipps and guest-checkout accounts).
+        user = CustomUser.objects.create_user(
             email=validated_data['email'],
-            password=validated_data['password'],
+            password=None,
             name=validated_data['name'],
             phone=validated_data['phone'],
         )
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+        return user
+
+
+class SetPasswordSerializer(serializers.Serializer):
+    """Chooses a password from a welcome / reset link."""
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=6)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
 
 
 class AuthResponseSerializer(serializers.Serializer):

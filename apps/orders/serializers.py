@@ -84,7 +84,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class CreateOrderSerializer(serializers.Serializer):
-    items = serializers.ListField(child=serializers.DictField())
+    items = serializers.ListField(child=serializers.DictField(), allow_empty=False)
     shippingAddress = serializers.DictField()
     paymentMethod = serializers.ChoiceField(choices=['vipps'], default='vipps')
 
@@ -126,14 +126,26 @@ class CreateOrderSerializer(serializers.Serializer):
         # storefront-displayed total); OrderItem.unit_price still uses the DB
         # value for downstream accounting.
         item_lines = []
+        missing_slugs = []
         for i in validated_data['items']:
+            slug = (i.get('slug') or '').strip()
             try:
-                product = Product.objects.get(slug=i.get('slug', ''))
+                product = Product.objects.get(slug=slug)
             except Product.DoesNotExist:
+                missing_slugs.append(slug or '(tom)')
                 continue
             qty = int(i.get('quantity', 1))
             unit_price = Decimal(str(i.get('price', 0)))
             item_lines.append({'product': product, 'qty': qty, 'unit_price': unit_price, 'raw': i})
+
+        # Refuse the whole order if any line is unknown. Skipping them quietly
+        # (as this did until 2026-08-28) let a stale cart slug produce a 0 kr
+        # order: the shipping label was bought and a 0 kr confirmation e-mailed
+        # before Vipps refused to take a payment of nothing. See SL-00028/29.
+        if missing_slugs:
+            raise serializers.ValidationError({
+                'items': ['Ukjent produkt: {}'.format(s) for s in missing_slugs],
+            })
 
         subtotal = sum(
             (line['unit_price'] * line['qty'] for line in item_lines),

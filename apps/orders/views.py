@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings as dj_settings
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +15,12 @@ log = logging.getLogger(__name__)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_order(request):
+    if getattr(dj_settings, 'ORDERING_PAUSED', False):
+        return Response(
+            {'detail': 'Nettbutikken er midlertidig stengt for bestilling.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     user = request.user
     serializer = CreateOrderSerializer(data=request.data, context={'user': user, 'request': request})
     if serializer.is_valid():

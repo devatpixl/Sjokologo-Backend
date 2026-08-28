@@ -116,6 +116,12 @@ STOREFRONT_URL = env('STOREFRONT_URL', default='https://sjokoloco.no')
 # up at a stand and read their mail days later.
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7
 
+# Ordering paused: the catalogue stays browsable but no order may be created.
+# The storefront hides every buy control (NEXT_PUBLIC_ORDERING_PAUSED); this is
+# the hard stop, so a stale tab, a saved cart or a direct API call cannot slip
+# an order through while production is down.
+ORDERING_PAUSED = env.bool('ORDERING_PAUSED', default=False)
+
 # Admin dashboard base used in internal notification emails ("see order in admin").
 ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
 

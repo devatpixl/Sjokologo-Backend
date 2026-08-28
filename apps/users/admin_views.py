@@ -1,3 +1,4 @@
+from django.utils import timezone as djtz
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -62,3 +63,70 @@ def admin_user_detail(request, pk):
         'user': UserSerializer(user).data,
         'orders': OrderSerializer(orders, many=True, context={'request': request}).data,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_loyalty_list(request):
+    """Kundeklubb members captured by the /bli-medlem form.
+
+    Search matches name, e-mail or phone. Ordering is newest first (the
+    model's Meta default), which is what ops wants after a stand.
+    """
+    from .models import LoyaltyMember
+
+    search = (request.query_params.get('search') or '').strip()
+    qs = LoyaltyMember.objects.all()
+    if search:
+        qs = (
+            qs.filter(email__icontains=search)
+            | qs.filter(first_name__icontains=search)
+            | qs.filter(phone__icontains=search)
+        )
+    return Response([
+        {
+            'id': str(m.id),
+            'first_name': m.first_name,
+            'email': m.email,
+            'phone': m.phone,
+            'birthday': m.birthday.isoformat() if m.birthday else None,
+            'source': m.source,
+            'created_at': m.created_at.isoformat(),
+        }
+        for m in qs
+    ])
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_loyalty_export(request):
+    """The same list as a CSV download, for mailings and for keeping a copy
+    off the server. Excel-friendly: semicolon separated with a BOM, so
+    Norwegian characters survive a double-click on Windows.
+    """
+    import csv
+    from io import StringIO
+
+    from django.http import HttpResponse
+
+    from .models import LoyaltyMember
+
+    buf = StringIO()
+    writer = csv.writer(buf, delimiter=';')
+    writer.writerow(['Fornavn', 'E-post', 'Telefon', 'Bursdag', 'Kilde', 'Registrert'])
+    for m in LoyaltyMember.objects.all():
+        writer.writerow([
+            m.first_name,
+            m.email,
+            m.phone,
+            m.birthday.isoformat() if m.birthday else '',
+            m.source,
+            m.created_at.strftime('%Y-%m-%d %H:%M'),
+        ])
+
+    response = HttpResponse(
+        '﻿' + buf.getvalue(), content_type='text/csv; charset=utf-8',
+    )
+    stamp = djtz.now().strftime('%Y%m%d')
+    response['Content-Disposition'] = f'attachment; filename="kundeklubb-{stamp}.csv"'
+    return response

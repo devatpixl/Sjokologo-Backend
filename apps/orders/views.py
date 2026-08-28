@@ -5,11 +5,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.emails import (
-    send_admin_new_order_email,
-    send_order_confirmation_email,
-)
-
 from .models import Order
 from .serializers import OrderSerializer, CreateOrderSerializer
 
@@ -23,20 +18,10 @@ def create_order(request):
     serializer = CreateOrderSerializer(data=request.data, context={'user': user, 'request': request})
     if serializer.is_valid():
         order = serializer.save()
-        # Customer confirmation + ops notification. Best-effort — never
-        # block order creation if Gmail is grumpy.
-        try:
-            send_order_confirmation_email(order)
-        except Exception:
-            log.exception(
-                'order confirmation email crashed for %s', order.order_number
-            )
-        try:
-            send_admin_new_order_email(order)
-        except Exception:
-            log.exception(
-                'admin new-order email crashed for %s', order.order_number
-            )
+        # No e-mail here. The confirmation and the ops notification are sent
+        # from the Vipps webhook once the payment is approved
+        # (apps/orders/notifications.send_order_emails_once), so an abandoned
+        # checkout never mails the customer or ops.
         return Response(
             OrderSerializer(order, context={'request': request}).data,
             status=status.HTTP_201_CREATED,

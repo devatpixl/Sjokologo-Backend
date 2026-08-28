@@ -131,6 +131,11 @@ class Order(models.Model):
     captured_at = models.DateTimeField(null=True, blank=True)
     last_vipps_sync_at = models.DateTimeField(null=True, blank=True)
 
+    # Set the first time the confirmation + ops e-mails are sent. They are
+    # sent once Vipps reports the payment approved, not at order creation, so
+    # an abandoned checkout never mails anyone. Doubles as the idempotency
+    # claim: webhooks can arrive twice or out of order.
+    confirmation_emails_sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

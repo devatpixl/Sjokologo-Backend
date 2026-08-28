@@ -75,10 +75,30 @@ def _shipping_detail_lines(order) -> list[tuple[str, str]]:
     return rows
 
 
+# The model's own status labels are English developer notes ("Pending — no
+# payment created yet"), which read like an error in a Norwegian ops e-mail.
+_PAYMENT_STATUS_NB = {
+    'AUTHORIZED': 'godkjent, beløpet trekkes',
+    'CAPTURED': 'betalt',
+    'PARTIALLY_REFUNDED': 'delvis refundert',
+    'REFUNDED': 'refundert',
+    'CANCELLED': 'kansellert',
+    'ABORTED': 'avbrutt av kunden',
+    'EXPIRED': 'utløpt',
+    'TERMINATED': 'avsluttet',
+    'FAILED': 'trekk feilet',
+    'CREATED': 'venter på kunden',
+    'PENDING': 'ikke startet',
+}
+
+
 def _payment_label(order) -> str:
     method = dict(order.PAYMENT_CHOICES).get(order.payment_method, order.payment_method or '—')
-    status = dict(order.PAYMENT_STATUS_CHOICES).get(order.payment_status, order.payment_status)
-    return f'{method} ({status})'
+    status = _PAYMENT_STATUS_NB.get(
+        order.payment_status,
+        dict(order.PAYMENT_STATUS_CHOICES).get(order.payment_status, order.payment_status),
+    )
+    return f'{method} — {status}'
 
 
 def _items_for_template(order) -> list[tuple[str, int, str]]:

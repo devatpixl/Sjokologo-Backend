@@ -18,6 +18,7 @@ from django.db import transaction
 from django.utils import timezone as djtz
 
 from apps.orders.models import Order
+from apps.orders.notifications import send_order_emails_once
 
 from .audit import record_payment_status_change
 from .capture import capture_payment
@@ -107,6 +108,9 @@ def _handle_authorized(payload: dict) -> None:
         order_to_capture = order
 
     if capture_eligible:
+        # Payment approved: this is the point the customer and ops hear about
+        # the order. Safe to call twice — the send is claimed once.
+        send_order_emails_once(order_to_capture)
         try:
             capture_payment(order_to_capture)
         except VippsAPIError:
@@ -146,6 +150,12 @@ def _handle_captured(payload: dict) -> None:
         record_payment_status_change(
             order, old_status=old_status, new_status=order.payment_status, source='webhook',
         )
+        captured_order = order
+
+    # Covers the case where CAPTURED lands without us having processed
+    # AUTHORIZED (out-of-order delivery, or a lost webhook the reconciler
+    # picked up). Already-sent orders are a no-op.
+    send_order_emails_once(captured_order)
 
 
 def _handle_refunded(payload: dict) -> None:

@@ -72,6 +72,13 @@ def create_payment_view(request) -> JsonResponse:
     if not order_number:
         return JsonResponse({'detail': 'order_number is required'}, status=400)
 
+    # WALLET (Vipps app) unless the storefront explicitly asks for CARD.
+    # Anything unrecognised falls back to WALLET rather than erroring, so an
+    # older storefront build can never break payments.
+    payment_type = body.get('payment_type')
+    if payment_type not in ('WALLET', 'CARD'):
+        payment_type = 'WALLET'
+
     try:
         order = Order.objects.get(order_number=order_number)
     except Order.DoesNotExist:
@@ -88,16 +95,50 @@ def create_payment_view(request) -> JsonResponse:
         'CREATED', 'AUTHORIZED', 'CAPTURED', 'PARTIALLY_REFUNDED', 'REFUNDED',
     ):
         if order.vipps_redirect_url and order.payment_status == 'CREATED':
+            # The stored redirect belongs to whichever method the payment was
+            # created with. If the customer has now picked the other method
+            # (started with the app, came back and chose card, or vice versa),
+            # cancel the pending payment and fall through to create a fresh
+            # one — references are single-use at Vipps, so a new one is minted.
+            existing_type = 'WALLET'
+            try:
+                existing = VippsClient().get_payment(order.vipps_reference)
+                existing_type = (existing.get('paymentMethod') or {}).get('type', 'WALLET')
+            except VippsAPIError:
+                logger.warning(
+                    'vipps.create.type_check_failed',
+                    extra={'reference': order.vipps_reference},
+                )
+            if existing_type == payment_type:
+                return JsonResponse(
+                    {'redirectUrl': order.vipps_redirect_url, 'reference': order.vipps_reference},
+                    status=200,
+                )
+            import uuid as _uuid
+            try:
+                VippsClient().cancel_payment(
+                    reference=order.vipps_reference,
+                    idempotency_key=f'switch-{order.vipps_reference}',
+                )
+            except VippsAPIError:
+                logger.warning(
+                    'vipps.create.switch_cancel_failed',
+                    extra={'reference': order.vipps_reference},
+                )
+            with transaction.atomic():
+                locked = Order.objects.select_for_update().get(pk=order.pk)
+                locked.vipps_reference = _build_reference(locked)
+                locked.vipps_redirect_url = ''
+                locked.save(update_fields=['vipps_reference', 'vipps_redirect_url'])
+            order.refresh_from_db()
+            # Fall through to create the payment with the newly chosen method.
+        else:
+            # Already authorized/captured — there's nothing to redirect to.
             return JsonResponse(
-                {'redirectUrl': order.vipps_redirect_url, 'reference': order.vipps_reference},
-                status=200,
+                {'detail': 'Payment already in progress', 'reference': order.vipps_reference,
+                 'payment_status': order.payment_status},
+                status=409,
             )
-        # Already authorized/captured — there's nothing to redirect to.
-        return JsonResponse(
-            {'detail': 'Payment already in progress', 'reference': order.vipps_reference,
-             'payment_status': order.payment_status},
-            status=409,
-        )
 
     if not order.vipps_reference:
         with transaction.atomic():
@@ -123,6 +164,7 @@ def create_payment_view(request) -> JsonResponse:
             return_url=return_url,
             payment_description=f'Sjokoloko ordre {order.order_number}',
             idempotency_key=idempotency_key,
+            payment_method_type=payment_type,
         )
     except VippsAPIError as exc:
         logger.exception(

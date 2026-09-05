@@ -8,7 +8,7 @@ class CouponAdminSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'code', 'kind', 'value', 'min_subtotal',
             'valid_from', 'valid_to', 'max_uses', 'times_used',
-            'is_active', 'created_at', 'updated_at',
+            'is_active', 'show_in_account', 'created_at', 'updated_at',
         ]
         read_only_fields = ['times_used', 'created_at', 'updated_at']
 

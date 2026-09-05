@@ -270,10 +270,16 @@ class VippsClient:
         payment_description: str,
         idempotency_key: UUID,
         user_flow: str = 'WEB_REDIRECT',
+        payment_method_type: str = 'WALLET',
     ) -> dict[str, Any]:
+        # WALLET = the Vipps app (the original flow, unchanged default).
+        # CARD = Vipps' hosted card page (Visa/Mastercard), same webhooks,
+        # capture and refund downstream. Anything else is a programming error.
+        if payment_method_type not in ('WALLET', 'CARD'):
+            raise ValueError(f'Unsupported payment method type: {payment_method_type}')
         body = {
             'amount': {'currency': currency, 'value': amount_minor},
-            'paymentMethod': {'type': 'WALLET'},
+            'paymentMethod': {'type': payment_method_type},
             'reference': reference,
             'returnUrl': return_url,
             'userFlow': user_flow,

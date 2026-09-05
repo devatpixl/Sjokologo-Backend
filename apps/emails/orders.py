@@ -41,6 +41,14 @@ def _shipping_label(order) -> str:
     )
 
 
+def _is_self_pickup(order) -> bool:
+    """Customer collects in the shop, so nothing is ever shipped or tracked."""
+    return (order.shipping_method or '') == 'self-pickup'
+
+
+SHOP_ADDRESS = 'Moerveien 1, 1430 Ås'
+
+
 def _shipping_detail_lines(order) -> list[tuple[str, str]]:
     """Address / pickup-point detail rows for the order confirmation block."""
     rows: list[tuple[str, str]] = []
@@ -140,8 +148,18 @@ def send_order_confirmation_email(order) -> bool:
 
     text = (
         f'Hei, {first}!\n\n'
-        'Vi har mottatt bestillingen din hos Sjoko Loco. '
-        'Du får ny beskjed på e-post når vi begynner å pakke den.\n\n'
+        'Vi har mottatt bestillingen din hos Sjoko Loco.\n\n'
+        + (
+            'All konfekten vår lages for hånd. Vi bruker 3-5 virkedager på å '
+            'produsere og gjøre bestillingen klar.\n\n'
+            f'Du får en ny e-post så snart bestillingen er klar til henting hos '
+            f'oss i {SHOP_ADDRESS}.\n\n'
+            if _is_self_pickup(order) else
+            'All konfekten vår lages for hånd. Vi bruker 3-5 virkedager på å '
+            'produsere og gjøre bestillingen klar, og etter at den er sendt tar '
+            'leveringen normalt 2-3 dager.\n\n'
+            'Du får en ny e-post med sporingsnummer når pakken er på vei.\n\n'
+        ) +
         f'Ordrenummer: {order.order_number}\n'
         f'Bestilt: {order.created_at:%d.%m.%Y %H:%M}\n\n'
         f'— Innhold —\n{item_lines}\n\n'
@@ -154,7 +172,17 @@ def send_order_confirmation_email(order) -> bool:
 
     intro_html = (
         '<p style="margin:0 0 12px;">Vi har mottatt bestillingen din hos Sjoko Loco.</p>'
-        '<p style="margin:0;">Du får ny beskjed på e-post når vi begynner å pakke den.</p>'
+        + (
+            '<p style="margin:0 0 12px;">All konfekten vår lages for hånd. Vi bruker '
+            '<strong>3-5 virkedager</strong> på å produsere og gjøre bestillingen klar.</p>'
+            f'<p style="margin:0;">Du får en ny e-post så snart bestillingen er klar til '
+            f'henting hos oss i {SHOP_ADDRESS}.</p>'
+            if _is_self_pickup(order) else
+            '<p style="margin:0 0 12px;">All konfekten vår lages for hånd. Vi bruker '
+            '<strong>3-5 virkedager</strong> på å produsere og gjøre bestillingen klar, '
+            'og etter at den er sendt tar leveringen normalt <strong>2-3 dager</strong>.</p>'
+            '<p style="margin:0;">Du får en ny e-post med sporingsnummer når pakken er på vei.</p>'
+        )
     )
 
     blocks = (
@@ -311,7 +339,57 @@ def send_order_packing_email(order) -> bool:
 
 # ── #6 Shipped (customer) ──────────────────────────────────────────────────
 
+def send_order_ready_for_pickup_email(order) -> bool:
+    """#6b — the order is made and waiting in the shop.
+
+    Self-pickup never involves a carrier, so it must never receive the
+    "sendt / sporing" mail: there is no parcel to track.
+    """
+    first = _first_name(order)
+    subject = f'Bestillingen din er klar til henting (#{order.order_number})'
+
+    text = (
+        f'Hei, {first}!\n\n'
+        f'Bestillingen din er ferdig og klar til henting hos oss i {SHOP_ADDRESS}.\n\n'
+        'Ta med ordrenummeret når du kommer.\n\n'
+        f'Ordrenummer: {order.order_number}\n\n'
+        'Vi gleder oss til å se deg!\n\n'
+        'Hilsen\n'
+        'Team Sjoko Loco'
+    )
+
+    intro_html = (
+        f'<p style="margin:0 0 12px;">Bestillingen din er ferdig og klar til henting '
+        f'hos oss i <strong>{escape(SHOP_ADDRESS)}</strong>.</p>'
+        '<p style="margin:0;">Ta med ordrenummeret når du kommer. Vi gleder oss til å se deg!</p>'
+    )
+
+    html = render_layout(
+        eyebrow='◈ Klar til henting',
+        heading=f'Hei, {first}!',
+        intro_html=intro_html,
+        blocks_html=render_status_box('◈ Status', 'Klar til henting'),
+        footer_lines=[
+            f'Ordrenummer: {order.order_number}',
+            f'Hentested: {SHOP_ADDRESS}',
+        ],
+    )
+
+    return send(
+        to=order.ship_email,
+        subject=subject,
+        text_body=text,
+        html_body=html,
+        label='order_ready_for_pickup',
+    )
+
+
 def send_order_shipped_email(order) -> bool:
+    # A self-pickup order is never "sent": there is no carrier and no tracking,
+    # so it gets the ready-to-collect message instead.
+    if _is_self_pickup(order):
+        return send_order_ready_for_pickup_email(order)
+
     first = _first_name(order)
     carrier_label = _shipping_label(order)
     tracking_url = (order.tracking_url or '').strip()
@@ -336,7 +414,8 @@ def send_order_shipped_email(order) -> bool:
     text = (
         f'Hei, {first}!\n\n'
         f'Bestillingen din er nå sendt med {carrier_label}. '
-        'Du kan følge pakken hele veien fram med sporingslenken under.\n\n'
+        'Leveringen tar normalt 2-3 dager, og du kan følge pakken hele veien '
+        'fram med sporingslenken under.\n\n'
         + (f'Sporingsnummer: {consignment}\n' if consignment else '')
         + tracking_text
         + pickup_text
@@ -348,7 +427,8 @@ def send_order_shipped_email(order) -> bool:
     intro_html = (
         f'<p style="margin:0 0 12px;">Bestillingen din er nå sendt med '
         f'<strong>{escape(carrier_label)}</strong>.</p>'
-        '<p style="margin:0;">Du kan følge pakken hele veien fram med sporingslenken under.</p>'
+        '<p style="margin:0;">Leveringen tar normalt <strong>2-3 dager</strong>, og du kan '
+        'følge pakken hele veien fram med sporingslenken under.</p>'
     )
 
     blocks_html = ''

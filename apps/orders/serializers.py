@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 from .models import Order, OrderItem
 from .audit import record_order_event
@@ -111,9 +112,34 @@ class CreateOrderSerializer(serializers.Serializer):
         required=False, allow_blank=True, allow_null=True, max_length=40,
     )
 
+    # The build-your-own box is the one product whose price the catalogue row
+    # does not carry: the builder charges by box size. Everything else is
+    # priced from the database, never from the client.
+    CUSTOM_BOX_SLUG = 'custom-sjokoladeboks'
+    CUSTOM_BOX_PRICES = {8: Decimal('261'), 16: Decimal('399')}
+    # Generous ceiling: the storefront stepper caps a line at 10, but bundles
+    # add several units at once, so a legitimate cart can exceed that. This
+    # only exists to stop absurd values (9999) reaching the carrier.
+    MAX_LINE_QTY = 50
+
+    def _resolve_unit_price(self, product, raw_item):
+        """The price the server charges for one unit — client input ignored.
+
+        SL-00028/29 taught us what happens when the order pipeline trusts the
+        browser: a tampered or buggy client must never be able to set its own
+        prices. The custom box is priced by its slot count (8 or 16 pieces);
+        every other product costs exactly its catalogue price.
+        """
+        if product.slug == self.CUSTOM_BOX_SLUG:
+            slots = raw_item.get('customSlots')
+            if isinstance(slots, list) and len(slots) in self.CUSTOM_BOX_PRICES:
+                return self.CUSTOM_BOX_PRICES[len(slots)]
+        return product.price
+
     def create(self, validated_data):
         from decimal import Decimal
         from django.conf import settings as dj_settings
+        from django.db import transaction
         from django.db.models import F
         from apps.products.models import Product
         from apps.coupons.models import Coupon
@@ -121,12 +147,11 @@ class CreateOrderSerializer(serializers.Serializer):
 
         addr = validated_data['shippingAddress']
 
-        # Build line entries up front: we need them for bundle matching and
-        # OrderItem creation. Trust client prices for subtotal (matches the
-        # storefront-displayed total); OrderItem.unit_price still uses the DB
-        # value for downstream accounting.
+        # Build line entries up front. Prices come from _resolve_unit_price —
+        # the client's price field is ignored entirely.
         item_lines = []
         missing_slugs = []
+        problems = []
         for i in validated_data['items']:
             slug = (i.get('slug') or '').strip()
             try:
@@ -134,18 +159,38 @@ class CreateOrderSerializer(serializers.Serializer):
             except Product.DoesNotExist:
                 missing_slugs.append(slug or '(tom)')
                 continue
-            qty = int(i.get('quantity', 1))
-            unit_price = Decimal(str(i.get('price', 0)))
+            try:
+                qty = int(i.get('quantity', 1))
+            except (TypeError, ValueError):
+                qty = 0
+            if qty < 1:
+                problems.append(
+                    f'«{product.name}» har ugyldig antall. Oppdater handlekurven.'
+                )
+                continue
+            if qty > self.MAX_LINE_QTY:
+                problems.append(
+                    f'Du kan bestille maks {self.MAX_LINE_QTY} av «{product.name}» '
+                    'om gangen. Ta kontakt for større bestillinger.'
+                )
+                continue
+            if not product.in_stock:
+                problems.append(f'«{product.name}» er dessverre utsolgt akkurat nå.')
+                continue
+            unit_price = self._resolve_unit_price(product, i)
             item_lines.append({'product': product, 'qty': qty, 'unit_price': unit_price, 'raw': i})
 
         # Refuse the whole order if any line is unknown. Skipping them quietly
         # (as this did until 2026-08-28) let a stale cart slug produce a 0 kr
         # order: the shipping label was bought and a 0 kr confirmation e-mailed
         # before Vipps refused to take a payment of nothing. See SL-00028/29.
-        if missing_slugs:
-            raise serializers.ValidationError({
-                'items': ['Ukjent produkt: {}'.format(s) for s in missing_slugs],
-            })
+        if missing_slugs or problems:
+            unknown = (
+                ['Ett eller flere produkter finnes ikke lenger. '
+                 'Tøm handlekurven og legg dem inn på nytt.']
+                if missing_slugs else []
+            )
+            raise serializers.ValidationError({'items': unknown + problems})
 
         subtotal = sum(
             (line['unit_price'] * line['qty'] for line in item_lines),
@@ -215,6 +260,11 @@ class CreateOrderSerializer(serializers.Serializer):
         # the customer of their free-shipping reward.
         shipping_supplied = validated_data.get('shipping')
         shipping = Decimal(str(shipping_supplied)) if shipping_supplied is not None else Decimal('0')
+        # The quote is client-supplied (no server-side Profrakt client yet), but
+        # it must at least be a sane, non-negative amount: a negative value
+        # would subtract from the total.
+        if shipping < 0 or shipping > Decimal('1000'):
+            raise serializers.ValidationError({'shipping': ['Ugyldig fraktbeløp.']})
         free_shipping_threshold = Decimal(str(
             getattr(dj_settings, 'FREE_SHIPPING_THRESHOLD_NOK', 949)
         ))
@@ -225,78 +275,92 @@ class CreateOrderSerializer(serializers.Serializer):
 
         total = subtotal - total_discount + shipping
 
+        # Belt and braces: no order may exist with a non-positive total. If any
+        # future bug reintroduces a way to zero the amount, it dies here as a
+        # loud 400 instead of a silent 0 kr order with a bought freight label.
+        if subtotal <= 0 or total <= 0:
+            raise serializers.ValidationError({
+                'items': ['Ordresummen ble 0 kr. Bestillingen er ikke lagt inn — '
+                          'ta kontakt med oss hvis dette ser feil ut.'],
+            })
+
         shipping_method = validated_data.get('shippingMethod') or None
         pickup = validated_data.get('pickupPoint') or {}
         consignment = validated_data.get('consignment') or {}
 
         user = self.context.get('user')
-        order = Order.objects.create(
-            user=user,
-            subtotal=subtotal,
-            shipping=shipping,
-            total=total,
-            coupon_code=coupon_code,
-            discount_amount=total_discount,
-            coupon_free_shipping=coupon_free_shipping,
-            bundles_applied=bundles_applied,
-            payment_method=validated_data.get('paymentMethod', 'vipps'),
-            ship_first_name=addr.get('firstName', ''),
-            ship_last_name=addr.get('lastName', ''),
-            ship_email=addr.get('email', ''),
-            ship_phone=addr.get('phone', ''),
-            ship_address=addr.get('address', ''),
-            ship_postal_code=addr.get('postalCode', ''),
-            ship_city=addr.get('city', ''),
-            ship_country=addr.get('country', 'Norge'),
-            shipping_method=shipping_method,
-            pickup_point_number=pickup.get('number') or None,
-            pickup_point_name=pickup.get('name') or None,
-            pickup_point_address1=pickup.get('address1') or None,
-            pickup_point_postcode=pickup.get('postcode') or None,
-            pickup_point_city=pickup.get('city') or None,
-            pickup_point_country=pickup.get('country') or None,
-            pickup_point_customer_number=pickup.get('customerNumber') or None,
-            consignment_id=consignment.get('id') or None,
-            consignment_number=consignment.get('number') or None,
-            consignment_pdf_url=consignment.get('consignmentPdf') or None,
-            tracking_url=consignment.get('trackingUrl') or None,
-            shipping_working_days=validated_data.get('shippingWorkingDays'),
-            shipping_expected_delivery=validated_data.get('shippingExpectedDelivery') or None,
-        )
-
-        for line in item_lines:
-            OrderItem.objects.create(
-                order=order,
-                product=line['product'],
-                quantity=line['qty'],
-                unit_price=line['product'].price,
-                variant=line['raw'].get('variant', ''),
-                initials=line['raw'].get('initials', ''),
-                custom_slots=line['raw'].get('customSlots'),
+        # One transaction: the order row, its items and the audit row are
+        # created together — a failure part-way can never leave an orphaned
+        # 0-item order behind (the qty=-1 crash used to do exactly that).
+        with transaction.atomic():
+            order = Order.objects.create(
+                user=user,
+                subtotal=subtotal,
+                shipping=shipping,
+                total=total,
+                coupon_code=coupon_code,
+                discount_amount=total_discount,
+                coupon_free_shipping=coupon_free_shipping,
+                bundles_applied=bundles_applied,
+                payment_method=validated_data.get('paymentMethod', 'vipps'),
+                ship_first_name=addr.get('firstName', ''),
+                ship_last_name=addr.get('lastName', ''),
+                ship_email=addr.get('email', ''),
+                ship_phone=addr.get('phone', ''),
+                ship_address=addr.get('address', ''),
+                ship_postal_code=addr.get('postalCode', ''),
+                ship_city=addr.get('city', ''),
+                ship_country=addr.get('country', 'Norge'),
+                shipping_method=shipping_method,
+                pickup_point_number=pickup.get('number') or None,
+                pickup_point_name=pickup.get('name') or None,
+                pickup_point_address1=pickup.get('address1') or None,
+                pickup_point_postcode=pickup.get('postcode') or None,
+                pickup_point_city=pickup.get('city') or None,
+                pickup_point_country=pickup.get('country') or None,
+                pickup_point_customer_number=pickup.get('customerNumber') or None,
+                consignment_id=consignment.get('id') or None,
+                consignment_number=consignment.get('number') or None,
+                consignment_pdf_url=consignment.get('consignmentPdf') or None,
+                tracking_url=consignment.get('trackingUrl') or None,
+                shipping_working_days=validated_data.get('shippingWorkingDays'),
+                shipping_expected_delivery=validated_data.get('shippingExpectedDelivery') or None,
             )
 
-        record_order_event(
-            order,
-            action='order_created',
-            source='storefront',
-            actor_user=user,
-            to_value={
-                'order_number': order.order_number,
-                'total': str(order.total),
-                'subtotal': str(order.subtotal),
-                'discount_amount': str(order.discount_amount),
-                'coupon_code': order.coupon_code or None,
-                'bundles_applied': order.bundles_applied,
-                'payment_method': order.payment_method,
-                'user_type': user.user_type if user else None,
-                'shipping_method': order.shipping_method,
-                'shipping_amount': str(order.shipping),
-                'pickup_point_name': order.pickup_point_name,
-                'consignment_number': order.consignment_number,
-                'shipping_expected_delivery': order.shipping_expected_delivery,
-                'shipping_working_days': order.shipping_working_days,
-            },
-        )
+            for line in item_lines:
+                OrderItem.objects.create(
+                    order=order,
+                    product=line['product'],
+                    quantity=line['qty'],
+                    unit_price=line['unit_price'],
+                    variant=line['raw'].get('variant', ''),
+                    initials=line['raw'].get('initials', ''),
+                    custom_slots=line['raw'].get('customSlots'),
+                )
+
+            record_order_event(
+                order,
+                action='order_created',
+                source='storefront',
+                actor_user=user,
+                to_value={
+                    'order_number': order.order_number,
+                    'total': str(order.total),
+                    'subtotal': str(order.subtotal),
+                    'discount_amount': str(order.discount_amount),
+                    'coupon_code': order.coupon_code or None,
+                    'bundles_applied': order.bundles_applied,
+                    'payment_method': order.payment_method,
+                    'user_type': user.user_type if user else None,
+                    'shipping_method': order.shipping_method,
+                    'shipping_amount': str(order.shipping),
+                    'pickup_point_name': order.pickup_point_name,
+                    'consignment_number': order.consignment_number,
+                    'shipping_expected_delivery': order.shipping_expected_delivery,
+                    'shipping_working_days': order.shipping_working_days,
+                },
+            )
+
 
         return order
 

@@ -10,6 +10,7 @@ from .orders import (
     send_admin_new_order_email,
     send_order_packing_email,
     send_order_shipped_email,
+    send_order_ready_for_pickup_email,
     send_order_delivered_email,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     'send_admin_new_order_email',
     'send_order_packing_email',
     'send_order_shipped_email',
+    'send_order_ready_for_pickup_email',
     'send_order_delivered_email',
 ]

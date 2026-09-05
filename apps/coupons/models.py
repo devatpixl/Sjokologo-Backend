@@ -42,6 +42,10 @@ class Coupon(models.Model):
     )
     times_used = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True, db_index=True)
+    # Ticked in the admin ("Vis i kundekonto"): the code is advertised as a
+    # card on the customer's account page. Unticked codes stay secret, so
+    # campaign/influencer codes never leak to every logged-in customer.
+    show_in_account = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

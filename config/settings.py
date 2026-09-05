@@ -122,6 +122,17 @@ PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7
 # an order through while production is down.
 ORDERING_PAUSED = env.bool('ORDERING_PAUSED', default=False)
 
+# ── Profrakt (EDI) — shipping labels ─────────────────────────────────────
+# The storefront still quotes prices at checkout (POST /costs/v2, which creates
+# nothing). These credentials are for POST /consignments, called only when ops
+# ships the order, so the carrier never announces a parcel that does not exist.
+PROFRAKT_BASE = env('PROFRAKT_BASE', default='https://edi.no')
+PROFRAKT_KEY = env('PROFRAKT_KEY', default='')
+PROFRAKT_SENDER = env('PROFRAKT_SENDER', default='')
+PROFRAKT_TRANSPORT_AGREEMENT = env('PROFRAKT_TRANSPORT_AGREEMENT', default='')
+PROFRAKT_POSTNORD_AGREEMENT = env('PROFRAKT_POSTNORD_AGREEMENT', default='')
+PROFRAKT_HTTP_TIMEOUT = env.float('PROFRAKT_HTTP_TIMEOUT', default=20.0)
+
 # Admin dashboard base used in internal notification emails ("see order in admin").
 ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
 

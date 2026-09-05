@@ -21,7 +21,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .models import LoyaltyMember
+from .models import CustomUser, LoyaltyMember
+from .password_setup import build_password_link
 
 log = logging.getLogger(__name__)
 
@@ -74,8 +75,29 @@ def loyalty_signup_view(request):
         },
     )
 
+    # The stand signup should leave the person as a registered customer, not
+    # just a marketing row. If the address has no account yet, create one with
+    # an unusable password (same as passwordless registration) and put an
+    # "Opprett passord" link in the welcome e-mail. Someone who already has a
+    # working login gets the discount code only — no link. A guest-checkout
+    # account (unusable password, cannot log in) counts as not registered.
+    password_url = None
+    user = CustomUser.objects.filter(email__iexact=email).first()
+    if user is None:
+        user = CustomUser.objects.create_user(
+            email=email,
+            password=None,
+            name=data['first_name'],
+            phone=data['phone'],
+        )
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+        password_url = build_password_link(user)
+    elif not user.has_usable_password():
+        password_url = build_password_link(user)
+
     try:
-        _send_welcome_email(member)
+        _send_welcome_email(member, password_url=password_url)
     except Exception as e:
         # Don't fail the signup if email sending hiccups — the member is
         # captured, we just log and tell the user something went wrong with
@@ -97,15 +119,27 @@ def loyalty_signup_view(request):
     )
 
 
-def _send_welcome_email(member: LoyaltyMember) -> None:
-    """Send the bilingual Norwegian welcome email with the discount code."""
+def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) -> None:
+    """Send the Norwegian welcome email with the discount code.
+
+    When ``password_url`` is given, the mail also carries an "Opprett passord"
+    link so the member finishes registering; it is omitted for addresses that
+    already have a working login.
+    """
     storefront = 'https://sjokoloco.no'
     subject = 'Velkommen til Sjoko Loco-familien — 20% rabattkode'
+
+    password_text = (
+        'Fullfør registreringen ved å velge ditt eget passord her:\n'
+        f'{password_url}\n'
+        'Lenken er gyldig i 7 dager.\n\n'
+    ) if password_url else ''
 
     # Plain-text fallback (for clients that don't render HTML).
     text = (
         f'Hei, {member.first_name}!\n\n'
         'Takk for at du meldte deg inn i lojalitetsprogrammet til Sjoko Loco.\n\n'
+        f'{password_text}'
         'Som medlem får du:\n'
         '  • 20% rabatt på alle kjøp — for alltid\n'
         f'  • Bruk rabattkoden: {LOYALTY_DISCOUNT_CODE}\n'
@@ -123,7 +157,7 @@ def _send_welcome_email(member: LoyaltyMember) -> None:
         'Team Sjoko Loco'
     )
 
-    html = _render_welcome_html(member.first_name, storefront)
+    html = _render_welcome_html(member.first_name, storefront, password_url)
 
     msg = EmailMultiAlternatives(
         subject=subject,
@@ -135,7 +169,36 @@ def _send_welcome_email(member: LoyaltyMember) -> None:
     msg.send(fail_silently=False)
 
 
-def _render_welcome_html(first_name: str, storefront: str) -> str:
+def _password_block(password_url: str | None) -> str:
+    """The "finish registering" section of the welcome e-mail. Empty for
+    addresses that already have a working login."""
+    if not password_url:
+        return ''
+    return f"""          <!-- Create password -->
+          <tr>
+            <td style="padding:18px 36px 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:rgba(201,163,91,0.08); border:1px solid rgba(201,163,91,0.35);">
+                <tr>
+                  <td style="padding:22px 24px;">
+                    <div style="font-size:10.5px; letter-spacing:0.32em; color:#C9A35B; text-transform:uppercase; margin-bottom:6px;">
+                      &#9672; Fullf&oslash;r registreringen
+                    </div>
+                    <div style="font-size:13.5px; line-height:1.65; color:rgba(245,239,230,0.78); margin-bottom:16px;">
+                      Velg ditt eget passord, s&aring; er kontoen din klar &mdash; med ordrehistorikk og raskere kasse.
+                      Lenken er gyldig i 7 dager.
+                    </div>
+                    <a href="{password_url}" style="display:inline-block; padding:12px 26px; background:#C9A35B; color:#0E0906; text-decoration:none; font-size:12px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase;">
+                      Opprett passord &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+"""
+
+
+def _render_welcome_html(first_name: str, storefront: str, password_url: str | None = None) -> str:
     """Inline-styled HTML email matching the chocolate-store editorial palette.
 
     Inline CSS only — most email clients strip <style> blocks. Colors are
@@ -221,6 +284,7 @@ def _render_welcome_html(first_name: str, storefront: str) -> str:
             </td>
           </tr>
 
+{_password_block(password_url)}
           <!-- Brand story -->
           <tr>
             <td style="padding:22px 36px 4px;">

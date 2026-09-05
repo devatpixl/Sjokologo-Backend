@@ -8,6 +8,7 @@ from apps.users.admin_views import (
     admin_loyalty_list, admin_loyalty_export,
 )
 from apps.products.admin_views import admin_product_list, admin_product_detail, admin_truffle_list, admin_truffle_detail
+from apps.products.label_views import admin_label_list, admin_label_detail
 from apps.orders.admin_views import (
     admin_order_list, admin_order_detail, admin_order_create_label,
 )
@@ -21,6 +22,8 @@ admin_patterns = [
     path('products/<int:pk>/', admin_product_detail, name='admin_product_detail'),
     path('truffles/', admin_truffle_list, name='admin_truffle_list'),
     path('truffles/<str:pk>/', admin_truffle_detail, name='admin_truffle_detail'),
+    path('labels/', admin_label_list, name='admin_label_list'),
+    path('labels/<int:pk>/', admin_label_detail, name='admin_label_detail'),
     path('orders/', admin_order_list, name='admin_order_list'),
     path('orders/<str:order_number>/', admin_order_detail, name='admin_order_detail'),
     path('orders/<str:order_number>/label/', admin_order_create_label, name='admin_order_label'),

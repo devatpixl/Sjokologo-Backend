@@ -11,9 +11,14 @@ from apps.users.permissions import IsAdminUser
 def admin_product_list(request):
     if request.method == 'GET':
         category = request.query_params.get('category')
-        qs = Product.objects.all()
+        stock = request.query_params.get('in_stock')
+        # Sellable products first: ops asked for the green ones on top, so the
+        # list opens on what can actually be sold rather than on sold-out rows.
+        qs = Product.objects.all().order_by('-in_stock', 'category', 'name')
         if category:
             qs = qs.filter(category=category)
+        if stock in ('true', 'false'):
+            qs = qs.filter(in_stock=(stock == 'true'))
         return Response(ProductSerializer(qs, many=True, context={'request': request}).data)
 
     serializer = ProductSerializer(data=request.data, context={'request': request})

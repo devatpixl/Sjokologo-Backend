@@ -3,7 +3,12 @@ from django.db import models
 
 
 class Order(models.Model):
+    # The customer's journey, as the client defined it: an order arrives as
+    # Mottatt, the team accepts it (Bekreftet), then it ships. One e-mail per
+    # step, three in total. Bekreftet used to be the default, which left no
+    # room for the team to actually confirm anything.
     STATUS_CHOICES = [
+        ('Mottatt', 'Mottatt'),
         ('Bekreftet', 'Bekreftet'),
         ('Pakkes', 'Pakkes'),
         ('Sendt', 'Sendt'),
@@ -36,7 +41,7 @@ class Order(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     shipping = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Bekreftet')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Mottatt')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
 
     # Discount snapshot — captured at order-create time by the serializer.

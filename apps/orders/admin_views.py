@@ -5,8 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from apps.emails import (
-    send_order_delivered_email,
-    send_order_packing_email,
+    send_order_confirmed_email,
     send_order_ready_for_pickup_email,
     send_order_shipped_email,
 )
@@ -20,10 +19,12 @@ log = logging.getLogger(__name__)
 # Map each fulfillment-status target to the email helper that should fire
 # when the order transitions *into* that status. Only emits one email per
 # real change; idempotent saves (PATCH same status) emit nothing.
+# Exactly three customer e-mails, as the client specified:
+#   order placed (sent on payment)  ->  Bekreftet  ->  Sendt / hentet
+# Pakkes and Levert deliberately send nothing; they are internal states.
 _STATUS_EMAIL_HANDLERS = {
-    'Pakkes': send_order_packing_email,
-    'Sendt':  send_order_shipped_email,
-    'Levert': send_order_delivered_email,
+    'Bekreftet': send_order_confirmed_email,
+    'Sendt':     send_order_shipped_email,
 }
 
 

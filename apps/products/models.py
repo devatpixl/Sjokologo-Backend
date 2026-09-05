@@ -43,3 +43,27 @@ class Truffle(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class LabelTemplate(models.Model):
+    """A saved Zebra label layout.
+
+    Ops prints ingredient labels per product, so the editor needs to hold more
+    than one: the text, font sizes and nutrition table are stored here under a
+    name and loaded back when that product is made again. Kept server-side
+    rather than in the browser, since several people print labels and a
+    cleared browser must not lose the client's product texts.
+
+    ``data`` is the editor's own state object, stored verbatim so new fields in
+    the editor need no migration here.
+    """
+    name = models.CharField(max_length=120, unique=True)
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name

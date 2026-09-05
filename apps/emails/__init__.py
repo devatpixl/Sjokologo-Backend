@@ -7,6 +7,7 @@ All call sites should import the small wrappers below rather than touching
 from .signup import send_welcome_email, send_admin_new_signup_email, send_password_reset_email
 from .orders import (
     send_order_confirmation_email,
+    send_order_confirmed_email,
     send_admin_new_order_email,
     send_order_packing_email,
     send_order_shipped_email,
@@ -19,6 +20,7 @@ __all__ = [
     'send_password_reset_email',
     'send_admin_new_signup_email',
     'send_order_confirmation_email',
+    'send_order_confirmed_email',
     'send_admin_new_order_email',
     'send_order_packing_email',
     'send_order_shipped_email',

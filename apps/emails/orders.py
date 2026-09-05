@@ -137,7 +137,7 @@ def _totals_for_template(order) -> list[tuple[str, str]]:
 def send_order_confirmation_email(order) -> bool:
     storefront = 'https://sjokoloco.no'
     first = _first_name(order)
-    subject = f'Ordrebekreftelse — #{order.order_number}'
+    subject = f'Vi har mottatt din ordre — #{order.order_number}'
 
     item_lines = '\n'.join(
         f'  • {name}  × {qty}  →  {line_total}'
@@ -148,41 +148,25 @@ def send_order_confirmation_email(order) -> bool:
 
     text = (
         f'Hei, {first}!\n\n'
-        'Vi har mottatt bestillingen din hos Sjoko Loco.\n\n'
-        + (
-            'All konfekten vår lages for hånd. Vi bruker 3-5 virkedager på å '
-            'produsere og gjøre bestillingen klar.\n\n'
-            f'Du får en ny e-post så snart bestillingen er klar til henting hos '
-            f'oss i {SHOP_ADDRESS}.\n\n'
-            if _is_self_pickup(order) else
-            'All konfekten vår lages for hånd. Vi bruker 3-5 virkedager på å '
-            'produsere og gjøre bestillingen klar, og etter at den er sendt tar '
-            'leveringen normalt 2-3 dager.\n\n'
-            'Du får en ny e-post med sporingsnummer når pakken er på vei.\n\n'
-        ) +
+        'Tusen takk for bestillingen din — det betyr mye for oss i Sjoko Loco.\n\n'
+        'Vårt team sjekker ordren nå, og du får en ny e-post så snart den er '
+        'bekreftet.\n\n'
         f'Ordrenummer: {order.order_number}\n'
         f'Bestilt: {order.created_at:%d.%m.%Y %H:%M}\n\n'
         f'— Innhold —\n{item_lines}\n\n'
         f'— Beløp —\n{total_lines}\n\n'
         f'— Levering —\n{addr_lines}\n\n'
-        f'Spørsmål? Bare svar på denne e-posten.\n\n'
+        f'Har du spørsmål, er det bare å svare på denne e-posten.\n\n'
+        'Vi gleder oss til å lage konfekten din!\n\n'
         'Hilsen\n'
         'Team Sjoko Loco'
     )
 
     intro_html = (
-        '<p style="margin:0 0 12px;">Vi har mottatt bestillingen din hos Sjoko Loco.</p>'
-        + (
-            '<p style="margin:0 0 12px;">All konfekten vår lages for hånd. Vi bruker '
-            '<strong>3-5 virkedager</strong> på å produsere og gjøre bestillingen klar.</p>'
-            f'<p style="margin:0;">Du får en ny e-post så snart bestillingen er klar til '
-            f'henting hos oss i {SHOP_ADDRESS}.</p>'
-            if _is_self_pickup(order) else
-            '<p style="margin:0 0 12px;">All konfekten vår lages for hånd. Vi bruker '
-            '<strong>3-5 virkedager</strong> på å produsere og gjøre bestillingen klar, '
-            'og etter at den er sendt tar leveringen normalt <strong>2-3 dager</strong>.</p>'
-            '<p style="margin:0;">Du får en ny e-post med sporingsnummer når pakken er på vei.</p>'
-        )
+        '<p style="margin:0 0 12px;">Tusen takk for bestillingen din — det betyr mye '
+        'for oss i Sjoko Loco.</p>'
+        '<p style="margin:0;">Vårt team sjekker ordren nå, og du får en ny e-post så '
+        'snart den er bekreftet.</p>'
     )
 
     blocks = (
@@ -192,7 +176,7 @@ def send_order_confirmation_email(order) -> bool:
 
     confirmation_url = f'{storefront}/takk?order={order.order_number}'
     html = render_layout(
-        eyebrow='◈ Ordrebekreftelse',
+        eyebrow='◈ Ordre mottatt',
         heading=f'Takk for bestillingen, {first}!',
         intro_html=intro_html,
         blocks_html=blocks,
@@ -290,6 +274,73 @@ def send_admin_new_order_email(order) -> bool:
         text_body=text,
         html_body=html,
         label='admin_new_order',
+    )
+
+
+# ── #4b Order confirmed by the team (customer) ─────────────────────────────
+
+def send_order_confirmed_email(order) -> bool:
+    """Sent when ops accepts the order, the second of the three customer mails.
+
+    This is where the production time belongs: the client wants nothing
+    promised until a human has looked at the order and accepted it.
+    """
+    first = _first_name(order)
+    subject = f'Ordren din er bekreftet — #{order.order_number}'
+
+    closing = (
+        f'Du får en ny e-post så snart bestillingen er klar til henting hos oss '
+        f'i {SHOP_ADDRESS}.'
+        if _is_self_pickup(order) else
+        'Du får mer informasjon på e-post når pakken er sendt.'
+    )
+
+    text = (
+        f'Hei, {first}!\n\n'
+        'Vårt team har bekreftet ordren din. Takk for bestillingen!\n\n'
+        f'{closing}\n\n'
+        'VIKTIG INFORMASJON\n'
+        '  Det tar 2-3 virkedager i produksjon, i tillegg kommer postgang.\n\n'
+        f'Ordrenummer: {order.order_number}\n\n'
+        'Takk igjen for din ordre!\n\n'
+        'Hilsen\n'
+        'Team Sjoko Loco'
+    )
+
+    intro_html = (
+        '<p style="margin:0 0 12px;">Vårt team har bekreftet ordren din. '
+        'Takk for bestillingen!</p>'
+        f'<p style="margin:0;">{escape(closing)}</p>'
+    )
+
+    blocks_html = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="background:rgba(201,163,91,0.08); border:1px solid rgba(201,163,91,0.35);">'
+        '<tr><td style="padding:20px 22px;">'
+        '<div style="font-size:10.5px; letter-spacing:0.3em; color:#C9A35B; '
+        'text-transform:uppercase; margin-bottom:8px;">&#9672; Viktig informasjon</div>'
+        '<div style="font-size:14px; line-height:1.7; color:rgba(245,239,230,0.85);">'
+        'Det tar <strong>2-3 virkedager</strong> i produksjon, i tillegg kommer postgang.'
+        '</div></td></tr></table>'
+    )
+
+    html = render_layout(
+        eyebrow='◈ Ordre bekreftet',
+        heading=f'Ordren din er bekreftet, {first}!',
+        intro_html=intro_html,
+        blocks_html=blocks_html,
+        footer_lines=[
+            f'Ordrenummer: {order.order_number}',
+            'Takk igjen for din ordre!',
+        ],
+    )
+
+    return send(
+        to=order.ship_email,
+        subject=subject,
+        text_body=text,
+        html_body=html,
+        label='order_confirmed',
     )
 
 

@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from .member import get_active_member_coupon, member_coupon_payload
 from .models import Coupon
 from .serializers import CouponValidateRequestSerializer
 
@@ -66,3 +67,27 @@ def my_coupons(request):
             'valid_to': c.valid_to.isoformat() if c.valid_to else None,
         })
     return Response(out)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def member_coupon(request):
+    """The discount the checkout applies automatically for a signed-in customer.
+
+    Anyone may ask *whether* there is an offer and how big it is, because the
+    checkout has to advertise "log in and get 20%" to someone who is not signed
+    in yet, and that claim must come from the live coupon rather than a hardcoded
+    string. The redeemable **code** is only returned to a signed-in customer:
+    it is worth 20% with no usage limit, so it is not handed to anonymous
+    callers.
+
+    204 means there is no live offer, which is how the storefront knows to stop
+    promising one.
+    """
+    coupon = get_active_member_coupon()
+    if coupon is None:
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    payload = member_coupon_payload(coupon)
+    if not request.user.is_authenticated:
+        payload.pop('code', None)
+    return Response(payload)

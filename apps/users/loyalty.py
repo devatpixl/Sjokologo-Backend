@@ -27,8 +27,9 @@ from .password_setup import build_password_link
 log = logging.getLogger(__name__)
 
 # The discount code referenced in the welcome email. Created manually in
-# the admin (kind=percent, value=20, no expiry, unlimited uses).
-LOYALTY_DISCOUNT_CODE = 'STAND'
+# the admin (kind=percent, value=20, no expiry, unlimited uses). Lives in
+# settings so the checkout and this e-mail always quote the same code.
+LOYALTY_DISCOUNT_CODE = settings.LOYALTY_DISCOUNT_CODE
 
 
 class LoyaltySignupSerializer(serializers.Serializer):

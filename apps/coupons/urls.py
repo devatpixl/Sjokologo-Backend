@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import validate_coupon, my_coupons
+from .views import validate_coupon, my_coupons, member_coupon
 
 urlpatterns = [
     path('coupons/validate/', validate_coupon, name='coupon_validate'),
     path('coupons/mine/', my_coupons, name='coupon_mine'),
+    path('coupons/member/', member_coupon, name='coupon_member'),
 ]

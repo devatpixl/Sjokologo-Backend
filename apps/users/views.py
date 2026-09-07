@@ -18,6 +18,7 @@ from .serializers import (
     RegisterSerializer, AuthResponseSerializer, UserSerializer, UserUpdateSerializer,
     PasswordChangeSerializer, SetPasswordSerializer, PasswordResetRequestSerializer,
 )
+from apps.coupons.member import get_active_member_coupon, member_coupon_payload
 from .password_setup import build_password_link, resolve_password_token
 
 log = logging.getLogger(__name__)
@@ -59,10 +60,20 @@ def register_view(request):
             log.exception('admin new-signup email crashed for %s', user.email)
         # No auth tokens here: the account has no password yet, so the customer
         # signs in only after following the link in their welcome e-mail.
-        return Response(
-            {'detail': 'created', 'email': user.email},
-            status=status.HTTP_201_CREATED,
-        )
+        #
+        # The member discount rides along in the response instead. Someone who
+        # signs up on the checkout page cannot log in before paying — the
+        # password link is still sitting in their inbox — so without this they
+        # would be promised 20% and then charged full price. The code is
+        # re-validated and priced server-side when the order is created.
+        payload = {'detail': 'created', 'email': user.email}
+        try:
+            coupon = get_active_member_coupon()
+            if coupon is not None:
+                payload['member_discount'] = member_coupon_payload(coupon)
+        except Exception:
+            log.exception('member discount lookup failed for %s', user.email)
+        return Response(payload, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

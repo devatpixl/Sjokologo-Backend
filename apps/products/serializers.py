@@ -53,6 +53,37 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {'image': {'write_only': True, 'required': False}}
 
+    def validate_price(self, value):
+        """A visible product must be buyable.
+
+        Nothing stopped a product being saved at 0 (or a negative price), and
+        the shop only filters on in_stock — so it would appear for sale and
+        then die at checkout on the "Ordresummen ble 0 kr" guard. Cheaper to
+        refuse it here, while someone is looking at the form, than to let a
+        customer discover it.
+        """
+        if value is None or value <= 0:
+            raise serializers.ValidationError(
+                'Prisen må være større enn 0. Et produkt med pris 0 vises i '
+                'butikken, men kan ikke kjøpes.'
+            )
+        return value
+
+    def validate(self, attrs):
+        # Same reasoning for the optional range used by variant products.
+        for field in ('price_min', 'price_max'):
+            value = attrs.get(field)
+            if value is not None and value <= 0:
+                raise serializers.ValidationError(
+                    {field: 'Må være større enn 0 hvis den er satt.'}
+                )
+        low, high = attrs.get('price_min'), attrs.get('price_max')
+        if low is not None and high is not None and low > high:
+            raise serializers.ValidationError(
+                {'price_min': 'Kan ikke være høyere enn price_max.'}
+            )
+        return attrs
+
     def get_image_url(self, obj):
         request = self.context.get('request')
         if obj.image and request:

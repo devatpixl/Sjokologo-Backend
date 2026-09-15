@@ -48,7 +48,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'slug', 'name', 'category', 'size',
             'price', 'price_min', 'price_max',
             'image', 'image_url', 'flavors', 'blurb',
-            'in_stock', 'variant_group', 'variant_label',
+            'in_stock', 'is_active', 'variant_group', 'variant_label',
             'batch_number', 'batch_count', 'batch_total',
         ]
         extra_kwargs = {'image': {'write_only': True, 'required': False}}

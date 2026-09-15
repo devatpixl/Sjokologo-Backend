@@ -6,7 +6,7 @@ from .serializers import ProductSerializer, TruffleSerializer
 
 @api_view(['GET'])
 def product_list(request):
-    qs = Product.objects.filter(in_stock=True)
+    qs = Product.objects.filter(in_stock=True, is_active=True)
     category = request.query_params.get('category')
     if category:
         qs = qs.filter(category=category)
@@ -16,7 +16,10 @@ def product_list(request):
 @api_view(['GET'])
 def product_detail(request, slug):
     try:
-        product = Product.objects.get(slug=slug)
+        # Deactivated products 404 on purpose — that is what makes the
+        # "deactivate" switch remove them from the site entirely, rather than
+        # just from the shop grid the way "Utsolgt" does.
+        product = Product.objects.get(slug=slug, is_active=True)
     except Product.DoesNotExist:
         return Response({'detail': 'Not found.'}, status=404)
     return Response(ProductSerializer(product, context={'request': request}).data)
@@ -24,7 +27,7 @@ def product_detail(request, slug):
 
 @api_view(['GET'])
 def product_slugs(request):
-    return Response(list(Product.objects.values_list('slug', flat=True)))
+    return Response(list(Product.objects.filter(is_active=True).values_list('slug', flat=True)))
 
 
 @api_view(['GET'])

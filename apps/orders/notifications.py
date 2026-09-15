@@ -18,6 +18,7 @@ import logging
 from django.utils import timezone as djtz
 
 from apps.emails import send_admin_new_order_email, send_order_confirmation_email
+from apps.whatsapp import notify_admin_new_order
 
 from .models import Order
 
@@ -48,4 +49,12 @@ def send_order_emails_once(order: Order) -> bool:
         send_admin_new_order_email(order)
     except Exception:
         log.exception('admin new-order email crashed for %s', order.order_number)
+
+    # Same alert, second channel. No-ops entirely unless WHATSAPP_ENABLED is
+    # on, and is wrapped like the e-mails so a WhatsApp outage can never
+    # break payment handling.
+    try:
+        notify_admin_new_order(order)
+    except Exception:
+        log.exception('admin new-order WhatsApp crashed for %s', order.order_number)
     return True

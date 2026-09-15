@@ -147,6 +147,23 @@ ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
 # All listed addresses get bcc-style copies of #2 + #4 in one SMTP send.
 ADMIN_NOTIFY_EMAILS = env.list('ADMIN_NOTIFY_EMAILS', default=[])
 
+# ── WhatsApp ops alerts (WAHA) ──────────────────────────────────────────
+# A short "new order" ping to the shop owner's phone, sent from the same
+# place as the ops e-mail above. WAHA is a Docker container on this host
+# bound to 127.0.0.1, holding a linked-device session for the shop's number,
+# so nothing leaves the machine and there is no WhatsApp Business account.
+#
+# Off unless WHATSAPP_ENABLED is set: shipping this code changes nothing
+# until the phone is linked and the flag is turned on.
+WHATSAPP_ENABLED = env.bool('WHATSAPP_ENABLED', default=False)
+WAHA_BASE_URL = env('WAHA_BASE_URL', default='http://127.0.0.1:3004')
+WAHA_API_KEY = env('WAHA_API_KEY', default='')
+WAHA_SESSION = env('WAHA_SESSION', default='sjokoloko')
+# Recipient, in WhatsApp's JID form: "<country><number>@c.us".
+WHATSAPP_ADMIN_CHAT_ID = env('WHATSAPP_ADMIN_CHAT_ID', default='')
+# Kept short — this call sits inside the Vipps webhook.
+WAHA_TIMEOUT_SECONDS = env.float('WAHA_TIMEOUT_SECONDS', default=5.0)
+
 # When set, every transactional email is rewritten to this address and the
 # original recipient is stamped into the subject. Leave empty in production.
 EMAIL_TEST_OVERRIDE = env('EMAIL_TEST_OVERRIDE', default='')

@@ -19,6 +19,13 @@ class Product(models.Model):
     flavors = models.JSONField(default=list)
     blurb = models.TextField()
     in_stock = models.BooleanField(default=True)
+    # Two different ideas, deliberately separate:
+    #   in_stock=False  -> "Utsolgt". Still a real page, still in Google; the
+    #                      shop grid hides it but an existing link works.
+    #   is_active=False -> deactivated. Gone from the site entirely: no shop
+    #                      listing, product URL 404s, dropped from the sitemap.
+    # Defaults True so existing products are unaffected.
+    is_active = models.BooleanField(default=True)
     variant_group = models.CharField(max_length=64, blank=True, default='')
     variant_label = models.CharField(max_length=64, blank=True, default='')
     batch_number = models.CharField(max_length=10)

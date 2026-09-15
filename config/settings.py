@@ -147,6 +147,18 @@ ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
 # All listed addresses get bcc-style copies of #2 + #4 in one SMTP send.
 ADMIN_NOTIFY_EMAILS = env.list('ADMIN_NOTIFY_EMAILS', default=[])
 
+# ── Storefront cache busting ────────────────────────────────────────────
+# The Next.js shop caches product pages for 60s (stale-while-revalidate), so
+# an edit is not visible on the next refresh — which reads as "the toggle did
+# nothing". Saving a product pings the storefront to drop those pages.
+# Best-effort: a failure here never blocks the save.
+# Deliberately NOT STOREFRONT_URL: that one is the public canonical URL used
+# in e-mail links, and this call should go straight to the Next.js process on
+# localhost — no DNS, no TLS, no nginx hop.
+REVALIDATE_URL = env('REVALIDATE_URL', default='http://127.0.0.1:3000')
+REVALIDATE_SECRET = env('REVALIDATE_SECRET', default='')
+REVALIDATE_TIMEOUT_SECONDS = env.float('REVALIDATE_TIMEOUT_SECONDS', default=3.0)
+
 # ── WhatsApp ops alerts (WAHA) ──────────────────────────────────────────
 # A short "new order" ping to the shop owner's phone, sent from the same
 # place as the ops e-mail above. WAHA is a Docker container on this host

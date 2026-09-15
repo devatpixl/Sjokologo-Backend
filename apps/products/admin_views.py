@@ -4,6 +4,7 @@ from rest_framework import status
 from .models import Product, Truffle
 from .serializers import ProductSerializer, TruffleSerializer
 from apps.users.permissions import IsAdminUser
+from .storefront import revalidate_storefront
 
 
 @api_view(['GET', 'POST'])
@@ -23,7 +24,8 @@ def admin_product_list(request):
 
     serializer = ProductSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
-        serializer.save()
+        product = serializer.save()
+        revalidate_storefront(getattr(product, 'slug', None))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -40,13 +42,18 @@ def admin_product_detail(request, pk):
         return Response(ProductSerializer(product, context={'request': request}).data)
 
     if request.method == 'DELETE':
+        slug = product.slug
         product.delete()
+        revalidate_storefront(slug)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     partial = request.method == 'PATCH'
     serializer = ProductSerializer(product, data=request.data, partial=partial, context={'request': request})
     if serializer.is_valid():
-        serializer.save()
+        product = serializer.save()
+        # Drop the storefront's cached pages so "Utsolgt" / "Aktiv" show up on
+        # the next refresh rather than up to a minute later.
+        revalidate_storefront(getattr(product, 'slug', None))
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

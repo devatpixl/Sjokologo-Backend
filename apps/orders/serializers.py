@@ -174,6 +174,16 @@ class CreateOrderSerializer(serializers.Serializer):
                     'om gangen. Ta kontakt for større bestillinger.'
                 )
                 continue
+            # Deactivated products 404 on the storefront, so a cart holding one
+            # is stale. Reject the order rather than let it through — otherwise
+            # a product can be unbuyable to look at and still orderable, which
+            # is how SL-00028/29 started.
+            if not getattr(product, 'is_active', True):
+                problems.append(
+                    f'«{product.name}» er ikke tilgjengelig lenger. '
+                    'Tøm handlekurven og legg varene inn på nytt.'
+                )
+                continue
             if not product.in_stock:
                 problems.append(f'«{product.name}» er dessverre utsolgt akkurat nå.')
                 continue

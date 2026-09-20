@@ -40,6 +40,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     waitlist_batches = models.JSONField(default=list)
     custom_box_count = models.PositiveIntegerField(default=0)
+    # Drives the "Kunder" badge in the admin panel, which replaced the
+    # per-signup e-mail to ops. False means nobody has dismissed this signup
+    # yet. Deliberately NOT cleared by opening the customer list: ops presses
+    # "Merk alle som sett", so glancing at the page never loses the count.
+    is_seen = models.BooleanField(default=False)
     # Saved shipping/contact info — used for checkout autofill
     phone = models.CharField(max_length=30, blank=True, default='')
     address = models.CharField(max_length=255, blank=True, default='')

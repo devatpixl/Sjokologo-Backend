@@ -9,9 +9,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'name', 'email', 'user_type', 'is_admin', 'waitlist_batches',
-                  'custom_box_count', 'order_count', 'created_at',
+                  'custom_box_count', 'order_count', 'created_at', 'is_seen',
                   'phone', 'address', 'postal_code', 'city', 'country']
-        read_only_fields = ['id', 'user_type', 'is_admin', 'created_at']
+        read_only_fields = ['id', 'user_type', 'is_admin', 'created_at', 'is_seen']
 
     def get_order_count(self, obj):
         return obj.orders.count()

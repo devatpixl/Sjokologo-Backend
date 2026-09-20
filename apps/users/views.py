@@ -9,9 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import AccessToken
 
-from apps.emails import (
-    send_admin_new_signup_email, send_welcome_email, send_password_reset_email,
-)
+from apps.emails import send_welcome_email, send_password_reset_email
 
 from .models import CustomUser
 from .serializers import (
@@ -47,17 +45,17 @@ def register_view(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        # Welcome + ops notification are best-effort: a Gmail blip must
-        # never block account creation. Both helpers already swallow and
-        # log their own exceptions, but we wrap defensively too.
+        # The welcome e-mail is best-effort: a Gmail blip must never block
+        # account creation. The helper already swallows and logs its own
+        # exceptions, but we wrap defensively too.
         try:
             send_welcome_email(user, password_url=build_password_link(user))
         except Exception:
             log.exception('welcome email crashed for %s', user.email)
-        try:
-            send_admin_new_signup_email(user)
-        except Exception:
-            log.exception('admin new-signup email crashed for %s', user.email)
+        # Ops are no longer e-mailed per signup — at ~20 registrations a week
+        # the alert stopped being read. The account lands unseen instead and
+        # shows up as a badge on Kunder in the admin panel, cleared by hand.
+        # send_admin_new_signup_email() still exists if this is ever reversed.
         # No auth tokens here: the account has no password yet, so the customer
         # signs in only after following the link in their welcome e-mail.
         #

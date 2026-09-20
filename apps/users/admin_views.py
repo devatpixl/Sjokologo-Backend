@@ -21,6 +21,9 @@ def admin_stats(request):
         'revenue': float(revenue),
         'waitlist': WaitlistEntry.objects.count(),
         'unread_contact': ContactSubmission.objects.filter(is_read=False).count(),
+        'new_customers': CustomUser.objects.filter(
+            is_admin=False, user_type='registered', is_seen=False
+        ).count(),
     })
 
 
@@ -32,6 +35,24 @@ def admin_user_list(request):
     if search:
         qs = qs.filter(email__icontains=search) | qs.filter(name__icontains=search)
     return Response(UserSerializer(qs, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_users_mark_seen(request):
+    """Dismiss the new-customer badge.
+
+    Opening the customer list deliberately does not clear it — ops asked for a
+    notification that survives a glance — so this is the only thing that does.
+    Marks every registered customer seen; ``ids`` narrows it to a subset if a
+    per-row dismiss is ever added to the UI.
+    """
+    qs = CustomUser.objects.filter(is_admin=False, user_type='registered', is_seen=False)
+    ids = request.data.get('ids')
+    if ids:
+        qs = qs.filter(pk__in=ids)
+    cleared = qs.update(is_seen=True)
+    return Response({'cleared': cleared})
 
 
 @api_view(['GET', 'PATCH', 'DELETE'])

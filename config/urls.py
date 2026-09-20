@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from apps.users.admin_views import (
-    admin_stats, admin_user_list, admin_user_detail,
+    admin_stats, admin_user_list, admin_user_detail, admin_users_mark_seen,
     admin_loyalty_list, admin_loyalty_export,
 )
 from apps.products.admin_views import admin_product_list, admin_product_detail, admin_truffle_list, admin_truffle_detail
@@ -13,6 +13,7 @@ from apps.orders.admin_views import (
     admin_order_list, admin_order_detail, admin_order_create_label,
 )
 from apps.utils.admin_views import admin_waitlist, admin_waitlist_detail, admin_contact_list, admin_contact_detail
+from apps.utils.admin_notifications import admin_notifications, admin_notifications_mark_read
 from apps.coupons.admin_views import admin_coupon_list, admin_coupon_detail
 from apps.bundles.admin_views import admin_bundle_list, admin_bundle_detail
 
@@ -28,11 +29,15 @@ admin_patterns = [
     path('orders/<str:order_number>/', admin_order_detail, name='admin_order_detail'),
     path('orders/<str:order_number>/label/', admin_order_create_label, name='admin_order_label'),
     path('users/', admin_user_list, name='admin_user_list'),
+    # Must stay above users/<str:pk>/ — otherwise 'mark-seen' matches as a pk.
+    path('users/mark-seen/', admin_users_mark_seen, name='admin_users_mark_seen'),
     path('users/<str:pk>/', admin_user_detail, name='admin_user_detail'),
     path('loyalty/', admin_loyalty_list, name='admin_loyalty_list'),
     path('loyalty/export/', admin_loyalty_export, name='admin_loyalty_export'),
     path('waitlist/', admin_waitlist, name='admin_waitlist'),
     path('waitlist/<int:pk>/', admin_waitlist_detail, name='admin_waitlist_detail'),
+    path('notifications/', admin_notifications, name='admin_notifications'),
+    path('notifications/mark-read/', admin_notifications_mark_read, name='admin_notifications_mark_read'),
     path('contact/', admin_contact_list, name='admin_contact_list'),
     path('contact/<int:pk>/', admin_contact_detail, name='admin_contact_detail'),
     path('coupons/', admin_coupon_list, name='admin_coupon_list'),

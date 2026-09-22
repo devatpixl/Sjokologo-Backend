@@ -147,6 +147,13 @@ ADMIN_URL = env('ADMIN_URL', default='https://admin.sjokoloco.no')
 # All listed addresses get bcc-style copies of #2 + #4 in one SMTP send.
 ADMIN_NOTIFY_EMAILS = env.list('ADMIN_NOTIFY_EMAILS', default=[])
 
+# Who hears about a WhatsApp-link outage. Deliberately NOT ADMIN_NOTIFY_EMAILS:
+# that list also receives every customer order e-mail (apps/emails/orders.py),
+# so adding a developer there to get outage alerts would silently CC them on
+# the shop's order flow. Defaults to ADMIN_NOTIFY_EMAILS, so this changes
+# nothing until WHATSAPP_ALERT_EMAILS is actually set in the environment.
+WHATSAPP_ALERT_EMAILS = env.list('WHATSAPP_ALERT_EMAILS', default=ADMIN_NOTIFY_EMAILS)
+
 # ── Storefront cache busting ────────────────────────────────────────────
 # The Next.js shop caches product pages for 60s (stale-while-revalidate), so
 # an edit is not visible on the next refresh — which reads as "the toggle did

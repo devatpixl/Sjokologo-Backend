@@ -29,6 +29,10 @@ INSTALLED_APPS = [
     'apps.coupons',
     'apps.bundles',
     'apps.emails',
+    # B2B HORECA portal. Deliberately its own app rather than fields bolted onto
+    # apps.orders: a HORECA order never touches Vipps, carries a company, a
+    # delivery date and a logo, and must not appear in any consumer query.
+    'apps.horeca',
 ]
 
 MIDDLEWARE = [
@@ -153,6 +157,40 @@ ADMIN_NOTIFY_EMAILS = env.list('ADMIN_NOTIFY_EMAILS', default=[])
 # the shop's order flow. Defaults to ADMIN_NOTIFY_EMAILS, so this changes
 # nothing until WHATSAPP_ALERT_EMAILS is actually set in the environment.
 WHATSAPP_ALERT_EMAILS = env.list('WHATSAPP_ALERT_EMAILS', default=ADMIN_NOTIFY_EMAILS)
+
+# ── HORECA (B2B) portal ─────────────────────────────────────────────────
+# Ops alerts for the B2B portal. Separate from ADMIN_NOTIFY_EMAILS for the same
+# reason WHATSAPP_ALERT_EMAILS is: that list also receives every consumer order
+# e-mail. Defaults to it, so nothing changes until this is set.
+HORECA_NOTIFY_EMAILS = env.list('HORECA_NOTIFY_EMAILS', default=ADMIN_NOTIFY_EMAILS)
+
+# Customer logos are CONFIDENTIAL and must not live under MEDIA_ROOT.
+# config/urls.py serves MEDIA_URL unconditionally and nginx serves /media/ in
+# production, so anything there is readable by anyone who guesses the URL. This
+# directory is reachable only through the authenticated streaming view.
+PRIVATE_MEDIA_ROOT = env('PRIVATE_MEDIA_ROOT', default=str(BASE_DIR / 'private-media'))
+
+# K-26 / K-27. Enforced in apps/horeca/logo_validation.py — note that
+# DATA_UPLOAD_MAX_MEMORY_SIZE does NOT cap multipart file parts, so this is the
+# only application-level limit. nginx client_max_body_size must be raised to
+# match, or a 25 MB logo works locally and 413s in production.
+HORECA_LOGO_MAX_BYTES = env.int('HORECA_LOGO_MAX_BYTES', default=25 * 1024 * 1024)
+# Measured on the LONGEST edge (see logo_validation.py for why). 1000 is a
+# placeholder until the print supplier gives the edible sheet's actual printed
+# width: at 300 DPI a 10 cm strip wants ~1180 px, at 200 DPI ~790 px.
+HORECA_LOGO_MIN_RASTER_PX = env.int('HORECA_LOGO_MIN_RASTER_PX', default=1000)
+
+# Order number series. Distinct prefix from the consumer SL- series so a glance
+# at a number says which business it belongs to.
+# K-5 describes public self-registration, and the portal implements it. It
+# ships CLOSED because the approval side is not staffed yet: an unapproved
+# company can log in and upload files, the endpoint has no throttle, and every
+# call sends two e-mails from the shop's own SMTP. Until Sjoko Loco can approve
+# accounts, companies are created in the Django admin instead, which also mails
+# the contact a password link. Flip to True to open it.
+HORECA_SELF_REGISTRATION = env.bool('HORECA_SELF_REGISTRATION', default=False)
+
+HORECA_ORDER_PREFIX = env('HORECA_ORDER_PREFIX', default='SLB')
 
 # ── Storefront cache busting ────────────────────────────────────────────
 # The Next.js shop caches product pages for 60s (stale-while-revalidate), so

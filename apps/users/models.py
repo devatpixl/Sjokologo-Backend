@@ -24,6 +24,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USER_TYPE_CHOICES = [
         ('registered', 'Registered'),
         ('guest', 'Guest'),
+        # A B2B portal user. Deliberately its own value rather than a flag: the
+        # "new customer" bell feed and the Kunder badge both already filter
+        # user_type='registered' (apps/utils/admin_notifications.py,
+        # apps/users/admin_views.py), so HORECA signups stay out of the consumer
+        # counters without touching a line of that code.
+        ('horeca', 'HORECA'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -44,6 +44,12 @@ staticfiles/
 .env.local
 .env.*.local
 .env.production
+# Timestamped copies taken before an edit. These are verbatim copies of .env
+# and therefore hold every secret in it — one `git add -A` away from being
+# published. Both this repo and the server accumulate them.
+.env.bak*
+.env.*.bak
+.env-backup*
 
 # ── Editor / OS ──
 .vscode/
@@ -72,3 +78,6 @@ coverage.xml
 *.sock
 celerybeat-schedule
 celerybeat.pid
+
+# Customer logos — confidential, never committed
+private-media/

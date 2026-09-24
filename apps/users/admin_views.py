@@ -17,7 +17,14 @@ def admin_stats(request):
     revenue = Order.objects.aggregate(total=Sum('total'))['total'] or 0
     return Response({
         'orders': Order.objects.count(),
-        'users': CustomUser.objects.filter(is_admin=False).count(),
+        # Excludes HORECA accounts only — they are counted in their own
+        # dashboard, and mixing them in overstates the shop's reach.
+        # Deliberately an exclude() rather than user_type='registered': that
+        # would ALSO drop guest-checkout rows, which have always been counted
+        # here. Moving that number is a separate decision, not a side effect
+        # of adding a B2B portal.
+        'users': CustomUser.objects.filter(is_admin=False)
+                                   .exclude(user_type='horeca').count(),
         'revenue': float(revenue),
         'waitlist': WaitlistEntry.objects.count(),
         'unread_contact': ContactSubmission.objects.filter(is_read=False).count(),

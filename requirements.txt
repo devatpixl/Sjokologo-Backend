@@ -7,3 +7,8 @@ django-environ>=0.13
 psycopg2-binary>=2.9
 requests>=2.32
 authlib>=1.3
+
+# Test harness. Both were already installed in .venv but missing here, so a
+# fresh checkout could not run the suite at all.
+pytest>=9.1
+pytest-django>=4.14

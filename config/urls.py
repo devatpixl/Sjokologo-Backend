@@ -16,6 +16,15 @@ from apps.utils.admin_views import admin_waitlist, admin_waitlist_detail, admin_
 from apps.utils.admin_notifications import admin_notifications, admin_notifications_mark_read
 from apps.coupons.admin_views import admin_coupon_list, admin_coupon_detail
 from apps.bundles.admin_views import admin_bundle_list, admin_bundle_detail
+from apps.horeca.admin_views import (
+    admin_horeca_company_list, admin_horeca_company_detail,
+    admin_horeca_logo_list, admin_horeca_logo_detail, admin_horeca_logo_file,
+    admin_horeca_order_list, admin_horeca_order_detail, admin_horeca_order_export,
+    admin_horeca_production, admin_horeca_packing_list, admin_horeca_day_logos,
+    admin_horeca_settings,
+    admin_horeca_blackout_list, admin_horeca_blackout_detail,
+    admin_horeca_product_list, admin_horeca_product_detail,
+)
 
 admin_patterns = [
     path('stats/', admin_stats, name='admin_stats'),
@@ -44,6 +53,38 @@ admin_patterns = [
     path('coupons/<int:pk>/', admin_coupon_detail, name='admin_coupon_detail'),
     path('bundles/', admin_bundle_list, name='admin_bundle_list'),
     path('bundles/<int:pk>/', admin_bundle_detail, name='admin_bundle_detail'),
+    # HORECA (B2B). UUID pks, so <uuid:pk> rather than <int:pk>.
+    path('horeca/companies/', admin_horeca_company_list,
+         name='admin_horeca_company_list'),
+    path('horeca/companies/<uuid:pk>/', admin_horeca_company_detail,
+         name='admin_horeca_company_detail'),
+    path('horeca/logos/', admin_horeca_logo_list, name='admin_horeca_logo_list'),
+    path('horeca/logos/<uuid:pk>/', admin_horeca_logo_detail,
+         name='admin_horeca_logo_detail'),
+    path('horeca/logos/<uuid:pk>/file/', admin_horeca_logo_file,
+         name='admin_horeca_logo_file'),
+    # Literal routes MUST precede <str:order_number>, or "export" is read as an
+    # order number — the same trap config/urls.py already notes for users/.
+    path('horeca/orders/export/', admin_horeca_order_export,
+         name='admin_horeca_order_export'),
+    path('horeca/orders/', admin_horeca_order_list, name='admin_horeca_order_list'),
+    path('horeca/orders/<str:order_number>/', admin_horeca_order_detail,
+         name='admin_horeca_order_detail'),
+    path('horeca/production/', admin_horeca_production,
+         name='admin_horeca_production'),
+    path('horeca/production/packing-list/', admin_horeca_packing_list,
+         name='admin_horeca_packing_list'),
+    path('horeca/production/logos.zip', admin_horeca_day_logos,
+         name='admin_horeca_day_logos'),
+    path('horeca/settings/', admin_horeca_settings, name='admin_horeca_settings'),
+    path('horeca/blackouts/', admin_horeca_blackout_list,
+         name='admin_horeca_blackout_list'),
+    path('horeca/blackouts/<int:pk>/', admin_horeca_blackout_detail,
+         name='admin_horeca_blackout_detail'),
+    path('horeca/products/', admin_horeca_product_list,
+         name='admin_horeca_product_list'),
+    path('horeca/products/<int:pk>/', admin_horeca_product_detail,
+         name='admin_horeca_product_detail'),
 ]
 
 urlpatterns = [
@@ -55,5 +96,6 @@ urlpatterns = [
     path('api/', include('apps.payments_vipps.urls')),
     path('api/', include('apps.coupons.urls')),
     path('api/', include('apps.bundles.urls')),
+    path('api/horeca/', include('apps.horeca.urls')),
     path('api/admin/', include(admin_patterns)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

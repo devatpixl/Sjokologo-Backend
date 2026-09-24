@@ -122,6 +122,13 @@ def admin_horeca_company_list(request):
     for company in qs:
         row = CompanySerializer(company).data
         row['member_count'] = company.member_count
+        # company.email is the invoice address and is often blank — the person
+        # to actually write to is the first administrator, whose address is
+        # their login. Without this the panel shows a dash next to a company
+        # that plainly has a user.
+        contact = _primary_contact(company)
+        row['contact_email'] = contact.email if contact else ''
+        row['contact_name'] = (contact.name or '') if contact else ''
         data.append(row)
     return Response(data)
 
@@ -162,6 +169,10 @@ def _admin_create_company(request):
             status=Company.Status.ACTIVE,
             approved_at=_tz.now(),
             approved_by=request.user,
+            # The form asks for one address. Use it for the company record too
+            # when nothing else was given, so invoices and mail have somewhere
+            # to go rather than an empty field.
+            **({'email': email} if email and not serializer.validated_data.get('email') else {}),
         )
         user = existing
         needs_password = user is None or not user.has_usable_password()

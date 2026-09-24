@@ -107,3 +107,20 @@ def test_a_valid_unused_org_number_is_accepted(admin_api):
     res = admin_api.post(URL, _body(org_number='912 000 001'), format='json')
     assert res.status_code == 201, res.data
     assert res.data['org_number'] == '912000001', 'spaces normalised away'
+
+
+def test_the_list_shows_who_to_contact(admin_api):
+    """The panel rendered a dash next to a company that plainly had a user,
+    because company.email is the invoice address and is usually blank."""
+    admin_api.post(URL, _body(), format='json')
+    rows = admin_api.get(URL).data
+    row = next(r for r in rows if r['org_number'] == '915933149')
+    assert row['contact_email'] == 'kjokken@bristol.test'
+    assert row['contact_name'] == 'Ola'
+    assert row['member_count'] == 1
+
+
+def test_creating_with_a_contact_also_fills_the_company_email(admin_api):
+    admin_api.post(URL, _body(), format='json')
+    from apps.horeca.models import Company
+    assert Company.objects.get(org_number='915933149').email == 'kjokken@bristol.test'

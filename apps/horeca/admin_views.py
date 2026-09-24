@@ -56,6 +56,7 @@ from .services import (
     validate_orderable,
 )
 from .serializers import (
+    CompanyAdminWriteSerializer,
     CompanySerializer,
     HorecaOrderSerializer,
     HorecaProductAdminSerializer,
@@ -79,10 +80,19 @@ def _primary_contact(company):
     return member.user if member else None
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAdminUser])
 def admin_horeca_company_list(request):
-    """K-59 — the approval queue, and the full customer list behind it."""
+    """K-59 — the approval queue, and the full customer list behind it.
+
+    POST creates a company and, optionally, its first user: the same thing the
+    Django admin form does, so the panel does not have to send anyone to
+    another app. A company we typed in is already vetted, so it is created
+    ACTIVE rather than queueing for our own approval.
+    """
+    if request.method == 'POST':
+        return _admin_create_company(request)
+
     qs = Company.objects.annotate(
         member_count=Count('members', filter=Q(members__is_active=True)),
     )
@@ -114,6 +124,81 @@ def admin_horeca_company_list(request):
         row['member_count'] = company.member_count
         data.append(row)
     return Response(data)
+
+
+
+def _admin_create_company(request):
+    """Company + first user + invitation, in one transaction.
+
+    Mirrors apps/horeca/admin.py's CompanyAdminForm — same rules, same e-mail —
+    because two ways of creating a company that behave differently is how you
+    get a customer who cannot log in.
+    """
+    from django.db import transaction
+    from django.utils import timezone as _tz
+    from apps.users.models import CustomUser
+    from apps.users.password_setup import build_password_link
+    from apps.emails import send_horeca_invite_email
+
+    data = request.data
+    email = (data.get('contact_email') or '').strip().lower()
+
+    existing = CustomUser.objects.filter(email__iexact=email).first() if email else None
+    # A consumer account is a real person with a password and an order history;
+    # silently turning it into a company login is a support call waiting.
+    if existing and existing.user_type == 'registered':
+        return Response(
+            {'contact_email': [
+                f'{email} har allerede en vanlig kundekonto. Bruk en annen '
+                'adresse, eller legg brukeren til manuelt etterpå.']},
+            status=http.HTTP_400_BAD_REQUEST,
+        )
+
+    serializer = CompanyAdminWriteSerializer(data=data)
+    serializer.is_valid(raise_exception=True)
+
+    with transaction.atomic():
+        company = serializer.save(
+            status=Company.Status.ACTIVE,
+            approved_at=_tz.now(),
+            approved_by=request.user,
+        )
+        user = existing
+        needs_password = user is None or not user.has_usable_password()
+        if user is None and email:
+            user = CustomUser.objects.create(
+                email=email,
+                name=(data.get('contact_person_name') or '').strip(),
+                user_type='horeca',
+            )
+            user.set_unusable_password()
+            user.save(update_fields=['password'])
+        elif user is not None and user.user_type == 'guest':
+            user.user_type = 'horeca'
+            user.save(update_fields=['user_type'])
+
+        if user is not None:
+            Membership.objects.get_or_create(
+                user=user, company=company,
+                defaults={'role': Membership.Role.BEDRIFTSADMIN,
+                          'invited_by': request.user,
+                          'invited_at': _tz.now()},
+            )
+
+    # Outside the transaction: a dead SMTP must not roll back the company.
+    if user is not None:
+        try:
+            send_horeca_invite_email(
+                user, company,
+                inviter_name=getattr(request.user, 'name', '') or '',
+                password_url=build_password_link(user) if needs_password else None,
+            )
+        except Exception:
+            log.exception('horeca admin invite mail failed for %s', email)
+
+    row = CompanySerializer(company).data
+    row['member_count'] = company.members.filter(is_active=True).count()
+    return Response(row, status=http.HTTP_201_CREATED)
 
 
 @api_view(['GET', 'PATCH'])

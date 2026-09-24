@@ -129,6 +129,38 @@ class CompanyRegisterSerializer(serializers.Serializer):
         return company
 
 
+class CompanyAdminWriteSerializer(serializers.ModelSerializer):
+    """Writable twin of CompanySerializer, for admin-side creation.
+
+    CompanySerializer sets read_only_fields = fields on purpose — the customer
+    must never edit their own company row — so creation needs its own
+    serializer rather than a flag that could be flipped by accident.
+    """
+
+    # Declared explicitly so DRF does NOT auto-attach its UniqueValidator.
+    # That one fires before validate_org_number and answers with "company med
+    # org number finnes allerede" — the model's name leaking into a message a
+    # person reads, and before the digits have even been normalised, so
+    # "915 933 149" would slip past it as unique.
+    org_number = serializers.CharField(max_length=32)
+
+    class Meta:
+        model = Company
+        fields = ['name', 'org_number', 'phone', 'email',
+                  'invoice_street', 'invoice_postal_code', 'invoice_city',
+                  'invoice_country']
+
+    def validate_org_number(self, value):
+        # The same MOD-11 check the public registration uses, not just a digit
+        # count: a transposed pair passes a length check, does not collide with
+        # anything, and quietly creates a second company that has to be merged
+        # by hand later — after it has been on an invoice.
+        digits = validate_org_number(value or '')
+        if Company.objects.filter(org_number=digits).exists():
+            raise serializers.ValidationError('Denne bedriften er allerede registrert.')
+        return digits
+
+
 class CompanySerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source='get_status_display', read_only=True)
 

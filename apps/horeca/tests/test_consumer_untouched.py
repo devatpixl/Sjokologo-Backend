@@ -55,12 +55,36 @@ def test_kunder_count_excludes_horeca_but_still_counts_guests():
     )
 
 
-def test_stats_response_shape_is_unchanged():
-    """The admin panel reads these keys by name — losing one breaks a card."""
+def test_stats_keeps_every_consumer_key():
+    """The admin panel reads these by name — losing one breaks a dashboard card.
+
+    Additive keys are fine and expected (the HORECA sidebar badges live here
+    too), so this pins a SUPERSET rather than equality. Removing or renaming
+    any of the six still fails.
+    """
     stats = _admin_client().get(reverse('admin_stats')).data
-    assert set(stats.keys()) == {
-        'orders', 'users', 'revenue', 'waitlist', 'unread_contact', 'new_customers',
-    }
+    required = {'orders', 'users', 'revenue', 'waitlist',
+                'unread_contact', 'new_customers'}
+    assert required <= set(stats.keys()), (
+        f'consumer dashboard keys went missing: {required - set(stats.keys())}'
+    )
+
+
+def test_stats_carries_the_horeca_queue_counts():
+    """The sidebar badges need these, and a missing key renders as NaN."""
+    stats = _admin_client().get(reverse('admin_stats')).data
+    assert stats['horeca_pending_companies'] == 0
+    assert stats['horeca_pending_logos'] == 0
+
+
+def test_stats_survives_the_horeca_app_being_unavailable(monkeypatch):
+    """The consumer dashboard must not die with the B2B portal."""
+    import apps.users.admin_views as av
+    monkeypatch.setattr(av, '_horeca_queue_counts',
+                        lambda: {'horeca_pending_companies': 0,
+                                 'horeca_pending_logos': 0})
+    stats = _admin_client().get(reverse('admin_stats')).data
+    assert stats['orders'] is not None
 
 
 # ── the new-customer bell feed and badge ────────────────────────────────────

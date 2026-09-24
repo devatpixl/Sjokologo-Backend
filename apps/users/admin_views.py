@@ -31,7 +31,24 @@ def admin_stats(request):
         'new_customers': CustomUser.objects.filter(
             is_admin=False, user_type='registered', is_seen=False
         ).count(),
+        # B2B work queues, for the sidebar badges. Imported here rather than at
+        # module scope so this view keeps working if the horeca app is ever
+        # removed — the consumer dashboard should not die with it.
+        **_horeca_queue_counts(),
     })
+
+
+def _horeca_queue_counts():
+    try:
+        from apps.horeca.models import Company, Logo
+        return {
+            'horeca_pending_companies': Company.objects.filter(
+                status=Company.Status.PENDING).count(),
+            'horeca_pending_logos': Logo.objects.filter(
+                status=Logo.Status.PENDING, is_archived=False).count(),
+        }
+    except Exception:
+        return {'horeca_pending_companies': 0, 'horeca_pending_logos': 0}
 
 
 @api_view(['GET'])

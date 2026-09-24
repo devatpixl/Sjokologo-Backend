@@ -1,5 +1,6 @@
 """Serializers for the HORECA portal."""
 from django.db import transaction
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.users.models import CustomUser
@@ -31,6 +32,11 @@ def validate_org_number(value: str) -> str:
         raise serializers.ValidationError(
             'Organisasjonsnummer må være 9 siffer.'
         )
+    # One flag for both the public and the admin path on purpose: two ways of
+    # creating a company that disagree about what is valid is how you get a
+    # record one screen accepts and the other refuses to edit.
+    if not settings.HORECA_STRICT_ORG_NUMBER:
+        return digits
     total = sum(int(d) * w for d, w in zip(digits[:8], _ORGNR_WEIGHTS))
     remainder = total % 11
     check = 0 if remainder == 0 else 11 - remainder

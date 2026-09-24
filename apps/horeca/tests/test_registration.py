@@ -109,11 +109,26 @@ def test_no_ops_recipients_configured_is_not_an_error(settings):
     assert len(mail.outbox) == 1
 
 
-# ── org number is validated properly, not just counted ──────────────────────
+# ── org number ──────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize('bad', ['12345', '', 'abcdefghi', ORG_BAD_CHECKSUM])
-def test_bad_org_numbers_are_refused(bad):
+@pytest.mark.parametrize('bad', ['12345', '', 'abcdefghi'])
+def test_malformed_org_numbers_are_refused(bad):
+    """Shape is checked in both modes — it ends up on an invoice."""
     res = _register(org_number=bad)
+    assert res.status_code == 400
+    assert 'org_number' in res.data
+
+
+def test_a_bad_checksum_passes_while_the_strict_flag_is_off():
+    """Shipped default. Turned off at the client's request because it was
+    rejecting the numbers they test with."""
+    res = _register(org_number=ORG_BAD_CHECKSUM)
+    assert res.status_code == 201
+
+
+def test_a_bad_checksum_is_refused_when_strict(settings):
+    settings.HORECA_STRICT_ORG_NUMBER = True
+    res = _register(org_number=ORG_BAD_CHECKSUM)
     assert res.status_code == 400
     assert 'org_number' in res.data
 

@@ -79,9 +79,25 @@ def test_a_normal_user_cannot_create_companies(api):
     assert res.status_code in (401, 403), 'IsAdminUser must hold'
 
 
-def test_a_transposed_org_number_is_caught(admin_api):
-    """915933149 is valid; 915933194 transposes the last pair. A digit count
-    would let it through, and it would not collide with anything."""
+def test_any_nine_digits_are_accepted_by_default(admin_api):
+    """Shipped default: the MOD-11 check digit is OFF. 123456789 fails the
+    checksum and must still go through."""
+    res = admin_api.post(URL, _body(org_number='123456789'), format='json')
+    assert res.status_code == 201, res.data
+
+
+def test_it_still_insists_on_nine_digits(admin_api):
+    """Relaxed is not absent — org_number ends up on an invoice."""
+    for bad in ['123', '', 'abcdefghi', '1234567890123']:
+        res = admin_api.post(URL, _body(org_number=bad), format='json')
+        assert res.status_code == 400, f'{bad!r} should be refused'
+
+
+def test_a_transposed_org_number_is_caught_when_strict(admin_api, settings):
+    """With HORECA_STRICT_ORG_NUMBER on: 915933149 is valid, 915933194
+    transposes the last pair. A digit count lets it through and it collides
+    with nothing, so the checksum is the only thing that catches it."""
+    settings.HORECA_STRICT_ORG_NUMBER = True
     res = admin_api.post(URL, _body(org_number='915933194'), format='json')
     assert res.status_code == 400
     assert 'ser ikke riktig ut' in str(res.data)

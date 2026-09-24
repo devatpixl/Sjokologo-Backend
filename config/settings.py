@@ -182,6 +182,16 @@ HORECA_LOGO_MIN_RASTER_PX = env.int('HORECA_LOGO_MIN_RASTER_PX', default=1000)
 
 # Order number series. Distinct prefix from the consumer SL- series so a glance
 # at a number says which business it belongs to.
+# The organisasjonsnummer MOD-11 check digit. Off for now at the client's
+# request — it was rejecting the numbers they were testing with. Any 9 digits
+# are accepted while this is False.
+#
+# Worth turning back on before real customers are onboarded: org_number is
+# unique and is what the accountant matches on, so a transposed pair does not
+# bounce — it silently creates a second company that looks legitimate and has
+# to be merged by hand, after it has been on an invoice.
+HORECA_STRICT_ORG_NUMBER = env.bool('HORECA_STRICT_ORG_NUMBER', default=False)
+
 # K-5 describes public self-registration, and the portal implements it. It
 # ships CLOSED because the approval side is not staffed yet: an unapproved
 # company can log in and upload files, the endpoint has no throttle, and every

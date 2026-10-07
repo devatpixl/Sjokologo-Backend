@@ -135,7 +135,7 @@ LOYALTY_DISCOUNT_CODE = env('LOYALTY_DISCOUNT_CODE', default='STAND')
 # lifetime member code. The coupon row's own valid_from/valid_to is what
 # decides whether it is mentioned, so the campaign ends by itself; set this to
 # '' to stop mentioning it regardless.
-CAMPAIGN_DISCOUNT_CODE = env('CAMPAIGN_DISCOUNT_CODE', default='STRAWBERRY30')
+CAMPAIGN_DISCOUNT_CODE = env('CAMPAIGN_DISCOUNT_CODE', default='STRA30')
 
 # ── Profrakt (EDI) — shipping labels ─────────────────────────────────────
 # The storefront still quotes prices at checkout (POST /costs/v2, which creates

@@ -131,11 +131,6 @@ ORDERING_PAUSED = env.bool('ORDERING_PAUSED', default=False)
 # offer can be swapped or retired from the admin without a deploy: if the
 # coupon is missing or inactive, the storefront simply stops advertising it.
 LOYALTY_DISCOUNT_CODE = env('LOYALTY_DISCOUNT_CODE', default='STAND')
-# Time-limited campaign code advertised in the welcome e-mail alongside the
-# lifetime member code. The coupon row's own valid_from/valid_to is what
-# decides whether it is mentioned, so the campaign ends by itself; set this to
-# '' to stop mentioning it regardless.
-CAMPAIGN_DISCOUNT_CODE = env('CAMPAIGN_DISCOUNT_CODE', default='STRA30')
 
 # ── Profrakt (EDI) — shipping labels ─────────────────────────────────────
 # The storefront still quotes prices at checkout (POST /costs/v2, which creates

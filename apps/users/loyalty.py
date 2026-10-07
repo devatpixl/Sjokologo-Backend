@@ -32,31 +32,6 @@ log = logging.getLogger(__name__)
 LOYALTY_DISCOUNT_CODE = settings.LOYALTY_DISCOUNT_CODE
 
 
-def _active_campaign_coupon():
-    """The time-limited campaign coupon, or None when there is no live one.
-
-    Wrapped in a blanket except on purpose: this decorates the welcome e-mail,
-    and nothing about an optional decoration may stop a new member receiving
-    their member code. Any failure here degrades to "no campaign block".
-
-    The coupon row is the single source of truth — its own valid_from/valid_to
-    ends the campaign with no deploy and no settings edit.
-    """
-    try:
-        code = (getattr(settings, 'CAMPAIGN_DISCOUNT_CODE', '') or '').strip().upper()
-        if not code or code == LOYALTY_DISCOUNT_CODE:
-            return None
-        from apps.coupons.models import Coupon
-        coupon = Coupon.objects.filter(code=code).first()
-        if coupon is None:
-            return None
-        ok, _ = coupon.is_currently_valid()
-        return coupon if ok else None
-    except Exception:
-        log.exception('Campaign coupon lookup failed; welcome e-mail sent without it')
-        return None
-
-
 class LoyaltySignupSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=100, trim_whitespace=True)
     email = serializers.EmailField()
@@ -161,22 +136,11 @@ def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) 
         'Lenken er gyldig i 7 dager.\n\n'
     ) if password_url else ''
 
-    campaign = _active_campaign_coupon()
-    campaign_text = (
-        'KAMPANJE — Vi feirer Strawberry\u2019s 30 års jubileum:\n'
-        f'  • {campaign.value:.0f}% rabatt i 30 dager\n'
-        f'  • Bruk kampanjekoden: {campaign.code}\n'
-        f'  • Gjelder til og med {campaign.valid_to:%d.%m.%Y}\n'
-        '  • Kassen bruker automatisk den koden som gir deg mest — '
-        'kampanjekoden kan ikke kombineres med medlemsrabatten\n\n'
-    ) if campaign and campaign.valid_to else ''
-
     # Plain-text fallback (for clients that don't render HTML).
     text = (
         f'Hei, {member.first_name}!\n\n'
         'Takk for at du meldte deg inn i lojalitetsprogrammet til Sjoko Loco.\n\n'
         f'{password_text}'
-        f'{campaign_text}'
         'Som medlem får du:\n'
         '  • 20% rabatt på alle kjøp — for alltid\n'
         f'  • Bruk rabattkoden: {LOYALTY_DISCOUNT_CODE}\n'
@@ -194,7 +158,7 @@ def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) 
         'Team Sjoko Loco'
     )
 
-    html = _render_welcome_html(member.first_name, storefront, password_url, campaign)
+    html = _render_welcome_html(member.first_name, storefront, password_url)
 
     msg = EmailMultiAlternatives(
         subject=subject,
@@ -235,42 +199,7 @@ def _password_block(password_url: str | None) -> str:
 """
 
 
-def _campaign_block(campaign) -> str:
-    """The time-limited campaign card. Empty when no campaign is live, which is
-    what keeps this out of the e-mail the day after it ends."""
-    if not campaign or not campaign.valid_to:
-        return ''
-    return f"""          <!-- Campaign -->
-          <tr>
-            <td style="padding:18px 36px 8px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:rgba(201,163,91,0.14); border:1px solid rgba(201,163,91,0.5);">
-                <tr>
-                  <td style="padding:22px 24px;">
-                    <div style="font-size:10.5px; letter-spacing:0.32em; color:#C9A35B; text-transform:uppercase; margin-bottom:6px;">
-                      &#9672; Kampanje
-                    </div>
-                    <div style="font-family: Georgia, 'Times New Roman', serif; font-weight:300; font-size:26px; color:#F5EFE6; margin-bottom:8px;">
-                      {campaign.value:.0f}% i 30 dager
-                    </div>
-                    <div style="font-size:13.5px; line-height:1.6; color:rgba(245,239,230,0.78); margin-bottom:14px;">
-                      Vi feirer Strawberry&rsquo;s 30 &aring;r jubileum. Bruk kampanjekoden i kassen:
-                    </div>
-                    <div style="display:inline-block; padding:12px 22px; background:#C9A35B; color:#0E0906; font-family: 'Courier New', monospace; font-weight:700; font-size:18px; letter-spacing:0.22em;">
-                      {campaign.code}
-                    </div>
-                    <div style="margin-top:14px; font-size:12px; line-height:1.6; color:rgba(245,239,230,0.6);">
-                      Gjelder til og med {campaign.valid_to:%d.%m.%Y}. Kassen bruker automatisk den koden
-                      som gir deg mest &mdash; kampanjekoden kan ikke kombineres med medlemsrabatten.
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-"""
-
-
-def _render_welcome_html(first_name: str, storefront: str, password_url: str | None = None, campaign=None) -> str:
+def _render_welcome_html(first_name: str, storefront: str, password_url: str | None = None) -> str:
     """Inline-styled HTML email matching the chocolate-store editorial palette.
 
     Inline CSS only — most email clients strip <style> blocks. Colors are
@@ -356,7 +285,6 @@ def _render_welcome_html(first_name: str, storefront: str, password_url: str | N
             </td>
           </tr>
 
-{_campaign_block(campaign)}
 {_password_block(password_url)}
           <!-- Brand story -->
           <tr>

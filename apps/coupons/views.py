@@ -75,10 +75,10 @@ def member_coupon(request):
     """The discount the checkout applies automatically for a signed-in customer.
 
     Anyone may ask *whether* there is an offer and how big it is, because the
-    checkout has to advertise "log in and get 20%" to someone who is not signed
+    checkout has to advertise "log in and get the member discount" to someone not signed
     in yet, and that claim must come from the live coupon rather than a hardcoded
     string. The redeemable **code** is only returned to a signed-in customer:
-    it is worth 20% with no usage limit, so it is not handed to anonymous
+    it is a real discount with no usage limit, so it is not handed to anonymous
     callers.
 
     204 means there is no live offer, which is how the storefront knows to stop

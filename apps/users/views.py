@@ -62,7 +62,7 @@ def register_view(request):
         # The member discount rides along in the response instead. Someone who
         # signs up on the checkout page cannot log in before paying — the
         # password link is still sitting in their inbox — so without this they
-        # would be promised 20% and then charged full price. The code is
+        # would be promised a discount and then charged full price. The code is
         # re-validated and priced server-side when the order is created.
         payload = {'detail': 'created', 'email': user.email}
         try:

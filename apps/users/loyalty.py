@@ -2,7 +2,7 @@
 
 The ``POST /api/loyalty/signup/`` endpoint captures the form posted from
 ``/bli-medlem`` on the storefront and sends a welcome email with the
-lifetime 20% discount code (``STAND``) via the configured SMTP backend.
+lifetime member discount code (``STAND``) via the configured SMTP backend.
 
 The discount code itself is configured in the admin; we just reference it
 by name in the email body.
@@ -120,6 +120,23 @@ def loyalty_signup_view(request):
     )
 
 
+def _member_discount_percent() -> int:
+    """The member discount as a whole percent, read from the live coupon.
+
+    Hardcoding it meant the e-mail kept promising a figure the coupon no longer
+    gave. Falls back to the previous wording only if the coupon cannot be read,
+    which is better than printing nothing where a number should be.
+    """
+    try:
+        from apps.coupons.member import get_active_member_coupon
+        coupon = get_active_member_coupon()
+        if coupon is not None and coupon.kind == coupon.KIND_PERCENT:
+            return int(coupon.value)
+    except Exception:
+        log.exception('Member coupon lookup failed; welcome e-mail used the fallback percent')
+    return 10
+
+
 def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) -> None:
     """Send the Norwegian welcome email with the discount code.
 
@@ -128,7 +145,8 @@ def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) 
     already have a working login.
     """
     storefront = 'https://sjokoloco.no'
-    subject = 'Velkommen til Sjoko Loco-familien — 20% rabattkode'
+    pct = _member_discount_percent()
+    subject = f'Velkommen til Sjoko Loco-familien — {pct}% rabattkode'
 
     password_text = (
         'Fullfør registreringen ved å velge ditt eget passord her:\n'
@@ -142,7 +160,7 @@ def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) 
         'Takk for at du meldte deg inn i lojalitetsprogrammet til Sjoko Loco.\n\n'
         f'{password_text}'
         'Som medlem får du:\n'
-        '  • 20% rabatt på alle kjøp — for alltid\n'
+        f'  • {pct}% rabatt på alle kjøp — for alltid\n'
         f'  • Bruk rabattkoden: {LOYALTY_DISCOUNT_CODE}\n'
         '  • Gjelder på alle kjøp i nettbutikken\n'
         '  • Din faste medlemsrabatt\n'
@@ -158,7 +176,7 @@ def _send_welcome_email(member: LoyaltyMember, password_url: str | None = None) 
         'Team Sjoko Loco'
     )
 
-    html = _render_welcome_html(member.first_name, storefront, password_url)
+    html = _render_welcome_html(member.first_name, storefront, password_url, pct)
 
     msg = EmailMultiAlternatives(
         subject=subject,
@@ -199,7 +217,7 @@ def _password_block(password_url: str | None) -> str:
 """
 
 
-def _render_welcome_html(first_name: str, storefront: str, password_url: str | None = None) -> str:
+def _render_welcome_html(first_name: str, storefront: str, password_url: str | None = None, pct: int = 10) -> str:
     """Inline-styled HTML email matching the chocolate-store editorial palette.
 
     Inline CSS only — most email clients strip <style> blocks. Colors are
@@ -251,7 +269,7 @@ def _render_welcome_html(first_name: str, storefront: str, password_url: str | N
                       ◈ Din medlemsrabatt
                     </div>
                     <div style="font-family: Georgia, 'Times New Roman', serif; font-weight:300; font-size:28px; color:#F5EFE6; margin-bottom:14px;">
-                      20% rabatt på alle kjøp — for alltid
+                      {pct}% rabatt på alle kjøp — for alltid
                     </div>
                     <div style="font-size:13.5px; color:rgba(245,239,230,0.7); margin-bottom:14px;">
                       Bruk rabattkoden i kassen:

@@ -1,3 +1,5 @@
+from django.db.models import ProtectedError
+from apps.orders.models import OrderItem
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -43,7 +45,30 @@ def admin_product_detail(request, pk):
 
     if request.method == 'DELETE':
         slug = product.slug
-        product.delete()
+        try:
+            product.delete()
+        except ProtectedError:
+            # OrderItem.product is PROTECT: a product that has been ordered
+            # cannot be removed without destroying the order it appears on.
+            # That is the correct rule - an order has to keep saying what was
+            # bought - but it surfaced as an unhandled 500 and a bare "Kunne
+            # ikke slette produkt" in the admin, which looks like a broken
+            # button rather than a deliberate guard.
+            used_in = OrderItem.objects.filter(product=product).values('order_id').distinct().count()
+            return Response(
+                {
+                    'detail': (
+                        f'«{product.name}» kan ikke slettes fordi produktet finnes i '
+                        f'{used_in} bestilling{"er" if used_in != 1 else ""}. '
+                        'Ordrehistorikken må vise hva som faktisk ble kjøpt. '
+                        'Skjul produktet i stedet — da forsvinner det fra nettbutikken, '
+                        'men bestillingene beholdes.'
+                    ),
+                    'code': 'product_in_use',
+                    'orders': used_in,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         revalidate_storefront(slug)
         return Response(status=status.HTTP_204_NO_CONTENT)
 

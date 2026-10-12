@@ -126,7 +126,7 @@ PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7
 # an order through while production is down.
 ORDERING_PAUSED = env.bool('ORDERING_PAUSED', default=False)
 
-# The 20% code the loyalty welcome e-mail hands out, and the one the checkout
+# The member code the loyalty welcome e-mail hands out, and the one the checkout
 # applies automatically for a signed-in customer. Kept configurable so the
 # offer can be swapped or retired from the admin without a deploy: if the
 # coupon is missing or inactive, the storefront simply stops advertising it.

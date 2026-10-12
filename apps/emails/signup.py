@@ -40,7 +40,7 @@ def send_welcome_email(user, password_url: str | None = None) -> bool:
         f'{password_text}'
         'Hos oss finner du håndlaget konfekt fra Ås, laget med naturlige '
         'råvarer — helt uten aroma eller konserveringsmidler.\n\n'
-        'Fri frakt på alle bestillinger over 299 kr.\n\n'
+        f'Fri frakt på alle bestillinger over {settings.FREE_SHIPPING_THRESHOLD_NOK} kr.\n\n'
         f'Handle her: {storefront}\n\n'
         'Hilsen\n'
         'Team Sjoko Loco'
@@ -52,7 +52,7 @@ def send_welcome_email(user, password_url: str | None = None) -> bool:
            'passord. Lenken er gyldig i 7 dager.</p>' if password_url else '')
         + '<p style="margin:0 0 12px;">Hos oss finner du håndlaget konfekt fra Ås, '
           'laget med naturlige råvarer — helt uten aroma eller konserveringsmidler.</p>'
-        + '<p style="margin:0; color:#C9A35B;">Fri frakt på alle bestillinger over 299 kr.</p>'
+        + f'<p style="margin:0; color:#C9A35B;">Fri frakt på alle bestillinger over {settings.FREE_SHIPPING_THRESHOLD_NOK} kr.</p>'
     )
 
     if password_url:

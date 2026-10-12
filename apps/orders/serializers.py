@@ -276,9 +276,12 @@ class CreateOrderSerializer(serializers.Serializer):
         if shipping < 0 or shipping > Decimal('1000'):
             raise serializers.ValidationError({'shipping': ['Ugyldig fraktbeløp.']})
         free_shipping_threshold = Decimal(str(
-            getattr(dj_settings, 'FREE_SHIPPING_THRESHOLD_NOK', 949)
+            getattr(dj_settings, 'FREE_SHIPPING_THRESHOLD_NOK', 599)
         ))
-        if (subtotal >= free_shipping_threshold
+        # Strictly greater: "fri frakt over 599 kr" means more than 599, so a
+        # 599 kr order still pays postage. Must match qualifiesForFreeShipping()
+        # in the storefront's lib/cart-shipping.ts.
+        if (subtotal > free_shipping_threshold
                 or coupon_free_shipping
                 or bundle_free_shipping):
             shipping = Decimal('0')

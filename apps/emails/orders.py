@@ -112,7 +112,7 @@ def _payment_label(order) -> str:
 def _items_for_template(order) -> list[tuple[str, int, str]]:
     rows: list[tuple[str, int, str]] = []
     for item in order.items.all().select_related('product'):
-        name = item.product.name if item.product_id else '(slettet produkt)'
+        name = item.display_name
         if item.variant:
             name = f'{name} — {item.variant}'
         line_total = _fmt_nok(Decimal(item.unit_price) * item.quantity)

@@ -163,15 +163,34 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey('products.Product', on_delete=models.PROTECT)
+    # SET_NULL, not PROTECT: a product that has stopped being sold has to be
+    # removable from the catalogue, and an order must survive that. The link is
+    # a convenience (image, slug, current page); what the order actually needs
+    # to keep saying is captured in product_name and unit_price below.
+    product = models.ForeignKey(
+        'products.Product', on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    # Snapshot of the name at the time of purchase. Without it a deleted
+    # product turns old orders into "(slettet produkt)", and a renamed one
+    # silently rewrites history.
+    product_name = models.CharField(max_length=200, blank=True, default='')
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=8, decimal_places=2)
     variant = models.CharField(max_length=50, blank=True)
     initials = models.CharField(max_length=10, blank=True)
     custom_slots = models.JSONField(null=True, blank=True)
 
+    @property
+    def display_name(self) -> str:
+        """What this line should be called, now and after the product is gone."""
+        if self.product_name:
+            return self.product_name
+        if self.product_id and self.product:
+            return self.product.name
+        return '(slettet produkt)'
+
     def __str__(self):
-        return f'{self.quantity}× {self.product.name} (#{self.order.order_number})'
+        return f'{self.quantity}× {self.display_name} (#{self.order.order_number})'
 
 
 class OrderAuditLog(models.Model):

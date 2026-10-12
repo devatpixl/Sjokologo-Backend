@@ -48,12 +48,11 @@ def admin_product_detail(request, pk):
         try:
             product.delete()
         except ProtectedError:
-            # OrderItem.product is PROTECT: a product that has been ordered
-            # cannot be removed without destroying the order it appears on.
-            # That is the correct rule - an order has to keep saying what was
-            # bought - but it surfaced as an unhandled 500 and a bare "Kunne
-            # ikke slette produkt" in the admin, which looks like a broken
-            # button rather than a deliberate guard.
+            # Orders no longer block a delete: OrderItem keeps its own
+            # product_name snapshot and the FK is SET_NULL, so history survives
+            # without the row. This branch is kept for anything else that may
+            # start protecting a product later - it must explain itself rather
+            # than surface as a 500 and a bare "Kunne ikke slette produkt".
             used_in = OrderItem.objects.filter(product=product).values('order_id').distinct().count()
             return Response(
                 {

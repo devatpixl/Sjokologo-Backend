@@ -6,7 +6,10 @@ from apps.products.serializers import ProductSerializer
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    # May be null once the product has been deleted from the catalogue. Clients
+    # must fall back to product_name, which is always populated.
     product = ProductSerializer(read_only=True)
+    product_name = serializers.CharField(source='display_name', read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
         source='product', queryset=__import__('apps.products.models', fromlist=['Product']).Product.objects.all(),
         write_only=True,
@@ -14,7 +17,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'unit_price', 'variant', 'initials', 'custom_slots']
+        fields = ['id', 'product', 'product_id', 'product_name', 'quantity', 'unit_price', 'variant', 'initials', 'custom_slots']
         read_only_fields = ['unit_price']
 
 
@@ -344,6 +347,9 @@ class CreateOrderSerializer(serializers.Serializer):
                 OrderItem.objects.create(
                     order=order,
                     product=line['product'],
+                    # Snapshot now: the catalogue may rename or remove this
+                    # product later, and the order must keep reading correctly.
+                    product_name=line['product'].name,
                     quantity=line['qty'],
                     unit_price=line['unit_price'],
                     variant=line['raw'].get('variant', ''),

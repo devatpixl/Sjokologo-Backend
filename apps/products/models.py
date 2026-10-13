@@ -6,6 +6,10 @@ class Product(models.Model):
         ('liten-sjokoladeboks', 'Liten sjokoladeboks'),
         ('stor-sjokoladeboks', 'Stor sjokoladeboks'),
         ('sjokoladebarer', 'Sjokoladebarer'),
+        # Seasonal. Kept as a real category rather than renaming an existing
+        # one, so the advent calendar does not inherit another product's slug,
+        # URL or order history, and can be retired without touching them.
+        ('julekalender', 'Julekalender'),
     ]
 
     slug = models.SlugField(max_length=200, unique=True)
